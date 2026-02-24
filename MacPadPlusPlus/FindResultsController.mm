@@ -1,0 +1,251 @@
+#import "FindResultsController.h"
+
+// ── Model ─────────────────────────────────────────────────────────────────────
+@implementation FindResultEntry
+@end
+
+// ── Private interface ─────────────────────────────────────────────────────────
+@interface FindResultsController ()
+@property (nonatomic, strong) NSTableView   *tableView;
+@property (nonatomic, strong) NSScrollView  *scrollView;
+@property (nonatomic, strong) NSTextField   *headerLabel;
+@property (nonatomic, strong) NSMutableArray<FindResultEntry *> *results;
+@property (nonatomic, copy,   nullable) NSString *searchTerm;
+@end
+
+// ── Implementation ────────────────────────────────────────────────────────────
+@implementation FindResultsController
+
+static NSString * const kColLine = @"line";
+static NSString * const kColText = @"text";
+
+- (void)loadView {
+    NSView *root = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 800, 200)];
+    root.wantsLayer = YES;
+    _results = [NSMutableArray new];
+
+    // ── Header bar ────────────────────────────────────────────────────────────
+    static const CGFloat kHeaderH = 26.0;
+
+    NSView *header = [[NSView alloc] initWithFrame:NSMakeRect(0, root.bounds.size.height - kHeaderH,
+                                                              root.bounds.size.width, kHeaderH)];
+    header.wantsLayer = YES;
+    header.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+
+    // Dynamic background that adapts to light / dark mode
+    header.wantsLayer = YES;
+    [header setWantsLayer:YES];
+    // Use a view-based layer background so it re-evaluates in dark mode
+    NSVisualEffectView *blur = [[NSVisualEffectView alloc]
+                                initWithFrame:header.bounds];
+    blur.material = NSVisualEffectMaterialSidebar;
+    blur.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+    blur.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [header addSubview:blur];
+
+    // Top separator line (above header, since header is at the top of the panel)
+    NSView *topSep = [[NSView alloc] initWithFrame:NSMakeRect(0, kHeaderH - 1,
+                                                              800, 1)];
+    topSep.wantsLayer = YES;
+    topSep.layer.backgroundColor = [NSColor separatorColor].CGColor;
+    topSep.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+    [root addSubview:topSep];
+
+    // Header label
+    _headerLabel = [NSTextField labelWithString:@"Find Results"];
+    _headerLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
+    _headerLabel.textColor = [NSColor secondaryLabelColor];
+    _headerLabel.frame = NSMakeRect(8, 4, 680, 18);
+    _headerLabel.autoresizingMask = NSViewWidthSizable;
+    [header addSubview:_headerLabel];
+
+    // Close button (×)
+    NSButton *closeBtn = [NSButton buttonWithTitle:@"✕"
+                                            target:self
+                                            action:@selector(closeResults)];
+    closeBtn.bezelStyle = NSBezelStyleInline;
+    closeBtn.font = [NSFont systemFontOfSize:10];
+    closeBtn.frame = NSMakeRect(root.bounds.size.width - 30, 3, 22, 20);
+    closeBtn.autoresizingMask = NSViewMinXMargin;
+    [header addSubview:closeBtn];
+
+    [root addSubview:header];
+
+    // ── Table inside a scroll view ────────────────────────────────────────────
+    _tableView = [[NSTableView alloc] init];
+    _tableView.delegate = self;
+    _tableView.dataSource = self;
+    _tableView.allowsMultipleSelection = NO;
+    _tableView.rowHeight = 18.0;
+    _tableView.intercellSpacing = NSMakeSize(0, 1);
+    _tableView.headerView = nil;          // no column header bar
+    _tableView.usesAlternatingRowBackgroundColors = YES;
+    _tableView.columnAutoresizingStyle = NSTableViewLastColumnOnlyAutoresizingStyle;
+    _tableView.target = self;
+    _tableView.action = @selector(tableRowClicked:);
+
+    // Line number column (fixed 58 px)
+    NSTableColumn *lineCol = [[NSTableColumn alloc] initWithIdentifier:kColLine];
+    lineCol.width    = 58;
+    lineCol.minWidth = 42;
+    lineCol.maxWidth = 80;
+    lineCol.resizingMask = NSTableColumnNoResizing;
+    [_tableView addTableColumn:lineCol];
+
+    // Content column (fills remaining width)
+    NSTableColumn *textCol = [[NSTableColumn alloc] initWithIdentifier:kColText];
+    textCol.width    = 720;
+    textCol.minWidth = 100;
+    textCol.resizingMask = NSTableColumnAutoresizingMask;
+    [_tableView addTableColumn:textCol];
+
+    _scrollView = [[NSScrollView alloc]
+                   initWithFrame:NSMakeRect(0, 0, 800, root.bounds.size.height - kHeaderH)];
+    _scrollView.documentView = _tableView;
+    _scrollView.hasVerticalScroller   = YES;
+    _scrollView.hasHorizontalScroller = NO;
+    _scrollView.autohidesScrollers    = YES;
+    _scrollView.autoresizingMask      = NSViewWidthSizable | NSViewHeightSizable;
+    [root addSubview:_scrollView];
+
+    self.view = root;
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+- (void)showResults:(NSArray<FindResultEntry *> *)results
+         searchTerm:(NSString *)term {
+    _searchTerm = term;
+    [_results setArray:results];
+
+    NSUInteger n = results.count;
+    NSString *plural = (n == 1) ? @"" : @"s";
+    _headerLabel.stringValue = [NSString stringWithFormat:
+        @"Find Results: \"%@\" — %lu match%@", term, (unsigned long)n, plural];
+
+    [_tableView reloadData];
+
+    if (n > 0) {
+        [_tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0]
+                byExtendingSelection:NO];
+        [_tableView scrollRowToVisible:0];
+    }
+}
+
+- (void)clearResults {
+    _searchTerm = nil;
+    [_results removeAllObjects];
+    _headerLabel.stringValue = @"Find Results";
+    [_tableView reloadData];
+}
+
+- (NSInteger)resultCount {
+    return (NSInteger)_results.count;
+}
+
+- (void)closeResults {
+    [_delegate findResultsControllerDidClose:self];
+}
+
+// ── Table click (navigate on single click) ────────────────────────────────────
+- (void)tableRowClicked:(id)sender {
+    NSInteger row = _tableView.clickedRow;
+    if (row < 0 || row >= (NSInteger)_results.count) return;
+    [_delegate findResultsController:self
+                 didSelectLineNumber:_results[row].lineNumber];
+}
+
+// ── NSTableViewDataSource ──────────────────────────────────────────────────────
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    return (NSInteger)_results.count;
+}
+
+// ── NSTableViewDelegate ────────────────────────────────────────────────────────
+- (nullable NSView *)tableView:(NSTableView *)tableView
+            viewForTableColumn:(nullable NSTableColumn *)tableColumn
+                           row:(NSInteger)row {
+    FindResultEntry *entry = _results[row];
+
+    NSTableCellView *cell = [tableView makeViewWithIdentifier:tableColumn.identifier
+                                                        owner:self];
+    if (!cell) {
+        cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
+        NSTextField *lbl = [NSTextField labelWithString:@""];
+        lbl.font = [NSFont monospacedSystemFontOfSize:11
+                                               weight:NSFontWeightRegular];
+        lbl.lineBreakMode = NSLineBreakByTruncatingTail;
+        lbl.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        lbl.frame = cell.bounds;
+        [cell addSubview:lbl];
+        cell.textField = lbl;
+        cell.identifier = tableColumn.identifier;
+    }
+
+    if ([tableColumn.identifier isEqualToString:kColLine]) {
+        // Right-aligned line number in secondary colour
+        cell.textField.stringValue  = [NSString stringWithFormat:@"%ld", (long)entry.lineNumber];
+        cell.textField.textColor    = [NSColor tertiaryLabelColor];
+        cell.textField.alignment    = NSTextAlignmentRight;
+        cell.textField.font         = [NSFont monospacedSystemFontOfSize:11
+                                                                  weight:NSFontWeightRegular];
+        cell.textField.attributedStringValue = [[NSAttributedString alloc]
+            initWithString:cell.textField.stringValue
+                attributes:@{
+                    NSFontAttributeName: cell.textField.font,
+                    NSForegroundColorAttributeName: [NSColor tertiaryLabelColor],
+                    NSParagraphStyleAttributeName: ({
+                        NSMutableParagraphStyle *ps = [NSMutableParagraphStyle new];
+                        ps.alignment = NSTextAlignmentRight;
+                        ps;
+                    })
+                }];
+    } else {
+        // Line content with match highlighted in orange
+        NSString *trimmed = [entry.lineText
+                             stringByTrimmingCharactersInSet:
+                                 [NSCharacterSet whitespaceCharacterSet]];
+        if (trimmed.length == 0) trimmed = @" ";
+
+        NSMutableAttributedString *attrStr =
+            [[NSMutableAttributedString alloc] initWithString:trimmed];
+
+        NSDictionary *baseAttrs = @{
+            NSFontAttributeName:            [NSFont monospacedSystemFontOfSize:11
+                                                                        weight:NSFontWeightRegular],
+            NSForegroundColorAttributeName: [NSColor labelColor]
+        };
+        [attrStr addAttributes:baseAttrs range:NSMakeRange(0, trimmed.length)];
+
+        // Highlight every occurrence of the search term
+        if (_searchTerm.length > 0) {
+            NSRange search = NSMakeRange(0, trimmed.length);
+            while (search.location < trimmed.length) {
+                NSRange found = [trimmed rangeOfString:_searchTerm
+                                               options:NSCaseInsensitiveSearch
+                                                 range:search];
+                if (found.location == NSNotFound) break;
+                [attrStr addAttributes:@{
+                    NSForegroundColorAttributeName: [NSColor systemOrangeColor],
+                    NSFontAttributeName:            [NSFont monospacedSystemFontOfSize:11
+                                                                               weight:NSFontWeightBold]
+                } range:found];
+                search = NSMakeRange(NSMaxRange(found),
+                                     trimmed.length - NSMaxRange(found));
+            }
+        }
+
+        cell.textField.attributedStringValue = attrStr;
+    }
+
+    return cell;
+}
+
+// Navigate on selection change (keyboard arrow keys)
+- (void)tableViewSelectionDidChange:(NSNotification *)notification {
+    NSInteger row = _tableView.selectedRow;
+    if (row < 0 || row >= (NSInteger)_results.count) return;
+    [_delegate findResultsController:self
+                 didSelectLineNumber:_results[row].lineNumber];
+}
+
+@end

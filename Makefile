@@ -153,6 +153,7 @@ APP_SRCS := \
     $(APP_SRC_DIR)/EditorView.mm \
     $(APP_SRC_DIR)/SyntaxHighlighter.mm \
     $(APP_SRC_DIR)/FindReplacePanel.mm \
+    $(APP_SRC_DIR)/FindResultsController.mm \
     $(APP_SRC_DIR)/StatusBarController.mm \
     $(APP_SRC_DIR)/PreferencesWindowController.mm
 
@@ -177,8 +178,31 @@ all: $(APP_DIR)/Contents/MacOS/$(BINARY_NAME)
 	@echo "  Run with:  make run"
 	@echo "  Or:        open '$(APP_DIR)'"
 
+# ---- Icon generation ----
+ICON_SCRIPT  := $(PROJ_ROOT)/make_icon.swift
+ICONSET_DIR  := $(BUILD_DIR)/AppIcon.iconset
+ICON_PNG     := $(BUILD_DIR)/icon_1024.png
+ICNS_TARGET  := $(APP_RES)/AppIcon.icns
+
+$(ICNS_TARGET): $(ICON_SCRIPT) | bundle-structure
+	@echo "Generating app icon..."
+	@mkdir -p $(ICONSET_DIR)
+	@swift $(ICON_SCRIPT) $(ICON_PNG)
+	@sips -z 16 16   $(ICON_PNG) --out $(ICONSET_DIR)/icon_16x16.png    2>/dev/null
+	@sips -z 32 32   $(ICON_PNG) --out $(ICONSET_DIR)/icon_16x16@2x.png 2>/dev/null
+	@sips -z 32 32   $(ICON_PNG) --out $(ICONSET_DIR)/icon_32x32.png    2>/dev/null
+	@sips -z 64 64   $(ICON_PNG) --out $(ICONSET_DIR)/icon_32x32@2x.png 2>/dev/null
+	@sips -z 128 128 $(ICON_PNG) --out $(ICONSET_DIR)/icon_128x128.png  2>/dev/null
+	@sips -z 256 256 $(ICON_PNG) --out $(ICONSET_DIR)/icon_128x128@2x.png 2>/dev/null
+	@sips -z 256 256 $(ICON_PNG) --out $(ICONSET_DIR)/icon_256x256.png  2>/dev/null
+	@sips -z 512 512 $(ICON_PNG) --out $(ICONSET_DIR)/icon_256x256@2x.png 2>/dev/null
+	@sips -z 512 512 $(ICON_PNG) --out $(ICONSET_DIR)/icon_512x512.png  2>/dev/null
+	@cp               $(ICON_PNG)      $(ICONSET_DIR)/icon_512x512@2x.png
+	@iconutil -c icns $(ICONSET_DIR) -o $@
+	@echo "Icon: $@"
+
 # ---- Link ----
-$(APP_DIR)/Contents/MacOS/$(BINARY_NAME): $(ALL_OBJS) | bundle-structure
+$(APP_DIR)/Contents/MacOS/$(BINARY_NAME): $(ALL_OBJS) $(ICNS_TARGET) | bundle-structure
 	@echo "Linking $(BINARY_NAME)..."
 	$(CXX) $(ALL_OBJS) $(LDFLAGS) -o $@
 	@echo "Linked: $@"

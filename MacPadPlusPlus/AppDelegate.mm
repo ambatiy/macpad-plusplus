@@ -227,6 +227,13 @@
     replaceItem.target = _mainWindowController;
     [searchMenu addItem:[NSMenuItem separatorItem]];
 
+    NSMenuItem *findAllItem = [searchMenu addItemWithTitle:@"Find All in Document"
+                                                   action:@selector(findAll)
+                                            keyEquivalent:@"f"];
+    findAllItem.target = [FindReplacePanel sharedPanel];
+    findAllItem.keyEquivalentModifierMask = NSEventModifierFlagCommand | NSEventModifierFlagShift;
+    [searchMenu addItem:[NSMenuItem separatorItem]];
+
     NSMenuItem *findNextItem = [searchMenu addItemWithTitle:@"Find Next" action:@selector(findNext) keyEquivalent:@"g"];
     findNextItem.target = [FindReplacePanel sharedPanel];
     NSMenuItem *findPrevItem = [searchMenu addItemWithTitle:@"Find Previous" action:@selector(findPrevious) keyEquivalent:@"G"];

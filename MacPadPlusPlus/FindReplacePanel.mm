@@ -10,6 +10,7 @@ static FindReplacePanel *sSharedPanel = nil;
 @property (nonatomic, strong) NSTextField *findField;
 @property (nonatomic, strong) NSButton *findNextBtn;
 @property (nonatomic, strong) NSButton *findPrevBtn;
+@property (nonatomic, strong) NSButton *findAllBtn;
 @property (nonatomic, strong) NSButton *markAllBtn;
 // Replace row (shown in replace mode)
 @property (nonatomic, strong) NSTextField *replaceField;
@@ -71,8 +72,13 @@ static FindReplacePanel *sSharedPanel = nil;
     _findPrevBtn.autoresizingMask = NSViewMinXMargin;
     [content addSubview:_findPrevBtn];
 
+    _findAllBtn = [NSButton buttonWithTitle:@"Find All" target:self action:@selector(findAll)];
+    _findAllBtn.frame = NSMakeRect(296, 62, 110, 22);
+    _findAllBtn.autoresizingMask = NSViewMinXMargin;
+    [content addSubview:_findAllBtn];
+
     _markAllBtn = [NSButton buttonWithTitle:@"Mark All" target:self action:@selector(markAll)];
-    _markAllBtn.frame = NSMakeRect(296, 62, 110, 22);
+    _markAllBtn.frame = NSMakeRect(296, 38, 110, 22);
     _markAllBtn.autoresizingMask = NSViewMinXMargin;
     [content addSubview:_markAllBtn];
 
@@ -178,6 +184,62 @@ static FindReplacePanel *sSharedPanel = nil;
 
 - (void)findPrevious {
     [self performFind:NO];
+}
+
+- (void)findAll {
+    NSString *term = _findField.stringValue;
+    if (term.length == 0 || !_targetEditor) return;
+
+    BOOL matchCase = (_matchCaseCheck.state == NSControlStateValueOn);
+    BOOL wholeWord = (_wholeWordCheck.state == NSControlStateValueOn);
+
+    NSString *content = [_targetEditor.scintillaView string] ?: @"";
+    NSArray<NSString *> *lines = [content componentsSeparatedByString:@"\n"];
+    NSMutableArray<FindResultEntry *> *results = [NSMutableArray array];
+    NSStringCompareOptions opts = matchCase ? 0 : NSCaseInsensitiveSearch;
+    NSCharacterSet *wordChars = [NSCharacterSet alphanumericCharacterSet];
+
+    for (NSInteger i = 0; i < (NSInteger)lines.count; i++) {
+        NSString *line = lines[i];
+        NSRange search = NSMakeRange(0, line.length);
+        while (search.location < line.length) {
+            NSRange found = [line rangeOfString:term options:opts range:search];
+            if (found.location == NSNotFound) break;
+
+            // Whole-word boundary check
+            if (wholeWord) {
+                BOOL leftBound  = (found.location == 0 ||
+                    ![wordChars characterIsMember:[line characterAtIndex:found.location - 1]]);
+                NSUInteger end  = NSMaxRange(found);
+                BOOL rightBound = (end >= line.length ||
+                    ![wordChars characterIsMember:[line characterAtIndex:end]]);
+                if (!leftBound || !rightBound) {
+                    search = NSMakeRange(NSMaxRange(found), line.length - NSMaxRange(found));
+                    continue;
+                }
+            }
+
+            FindResultEntry *entry = [[FindResultEntry alloc] init];
+            entry.lineNumber  = i + 1;
+            entry.lineText    = line;
+            entry.matchRange  = found;
+            [results addObject:entry];
+            break; // one entry per line (first match on the line)
+        }
+    }
+
+    NSUInteger n = results.count;
+    if (n == 0) {
+        _statusLabel.stringValue = @"Not found";
+        _statusLabel.textColor   = [NSColor systemRedColor];
+        NSBeep();
+    } else {
+        _statusLabel.stringValue = [NSString stringWithFormat:@"%lu line%@ found",
+                                    (unsigned long)n, (n == 1 ? @"" : @"s")];
+        _statusLabel.textColor   = [NSColor secondaryLabelColor];
+    }
+
+    [_findAllDelegate findPanel:self didFindAll:results forTerm:term];
 }
 
 - (void)markAll {

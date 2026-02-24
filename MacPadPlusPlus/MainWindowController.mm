@@ -2,6 +2,7 @@
 #import "EditorView.h"
 #import "StatusBarController.h"
 #import "FindReplacePanel.h"
+#import "FindResultsController.h"
 #import "SyntaxHighlighter.h"
 #import "PreferencesWindowController.h"
 #import "AppDelegate.h"
@@ -177,12 +178,14 @@ static const CGFloat kTabMaxWidth = 220.0;
 
 #pragma mark - MainWindowController
 
-@interface MainWindowController () <EditorViewDelegate, NSWindowDelegate>
+@interface MainWindowController () <EditorViewDelegate, NSWindowDelegate, NSSplitViewDelegate>
 @property (nonatomic, strong) NSMutableArray<MPDocument *> *mutableDocuments;
 @property (nonatomic, strong, nullable) MPDocument *mutableActiveDocument;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, EditorView *> *editorViews;
 @property (nonatomic, strong) MPTabBarView *tabBarView;
+@property (nonatomic, strong) NSSplitView *editorSplitView;
 @property (nonatomic, strong) NSView *editorContainer;
+@property (nonatomic, strong) FindResultsController *findResultsController;
 @property (nonatomic, strong) StatusBarController *statusBarController;
 @property (nonatomic, strong) NSToolbar *toolbar;
 @end
@@ -228,19 +231,43 @@ static const CGFloat kTabMaxWidth = 220.0;
     _tabBarView.closeAction = @selector(tabCloseButtonClicked:);
     [content addSubview:_tabBarView];
 
-    // --- Editor container ---
-    CGFloat editorTop = bounds.size.height - kTabBarHeight;
-    CGFloat editorHeight = editorTop - kStatusBarHeight;
-    _editorContainer = [[NSView alloc] initWithFrame:NSMakeRect(0, kStatusBarHeight, bounds.size.width, editorHeight)];
-    _editorContainer.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [content addSubview:_editorContainer];
-
     // --- Status bar ---
     _statusBarController = [[StatusBarController alloc] init];
     [_statusBarController loadView];
     _statusBarController.view.frame = NSMakeRect(0, 0, bounds.size.width, kStatusBarHeight);
     _statusBarController.view.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     [content addSubview:_statusBarController.view];
+
+    // --- Split view: editor (top) + find results (bottom, initially collapsed) ---
+    CGFloat splitTop = bounds.size.height - kTabBarHeight;
+    CGFloat splitH   = splitTop - kStatusBarHeight;
+
+    _editorSplitView = [[NSSplitView alloc]
+                        initWithFrame:NSMakeRect(0, kStatusBarHeight, bounds.size.width, splitH)];
+    _editorSplitView.vertical      = NO;          // horizontal divider (top/bottom)
+    _editorSplitView.dividerStyle  = NSSplitViewDividerStyleThin;
+    _editorSplitView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    _editorSplitView.delegate      = self;
+    [content addSubview:_editorSplitView];
+
+    // Top portion: editor views live here
+    _editorContainer = [[NSView alloc] initWithFrame:_editorSplitView.bounds];
+    [_editorSplitView addSubview:_editorContainer];
+
+    // Bottom portion: find results panel
+    _findResultsController = [[FindResultsController alloc] init];
+    [_findResultsController loadView];
+    _findResultsController.delegate = self;
+    _findResultsController.view.frame = NSMakeRect(0, 0, bounds.size.width, 0);
+    [_editorSplitView addSubview:_findResultsController.view];
+
+    // Collapse the find results panel once layout is complete
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CGFloat h = self->_editorSplitView.bounds.size.height;
+        if (h > 0) {
+            [self->_editorSplitView setPosition:h ofDividerAtIndex:0];
+        }
+    });
 }
 
 - (void)setupToolbar {
@@ -540,13 +567,71 @@ static const CGFloat kTabMaxWidth = 220.0;
 #pragma mark - Find/Replace
 
 - (void)showFindPanel {
-    [[FindReplacePanel sharedPanel] setTargetEditor:[self editorViewForDocument:_mutableActiveDocument]];
-    [[FindReplacePanel sharedPanel] showFindMode];
+    FindReplacePanel *panel = [FindReplacePanel sharedPanel];
+    panel.targetEditor    = [self editorViewForDocument:_mutableActiveDocument];
+    panel.findAllDelegate = self;
+    [panel showFindMode];
 }
 
 - (void)showFindAndReplacePanel {
-    [[FindReplacePanel sharedPanel] setTargetEditor:[self editorViewForDocument:_mutableActiveDocument]];
-    [[FindReplacePanel sharedPanel] showFindAndReplaceMode];
+    FindReplacePanel *panel = [FindReplacePanel sharedPanel];
+    panel.targetEditor    = [self editorViewForDocument:_mutableActiveDocument];
+    panel.findAllDelegate = self;
+    [panel showFindAndReplaceMode];
+}
+
+#pragma mark - NSSplitViewDelegate
+
+- (BOOL)splitView:(NSSplitView *)splitView canCollapseSubview:(NSView *)subview {
+    return subview == _findResultsController.view;
+}
+
+- (CGFloat)splitView:(NSSplitView *)splitView
+    constrainMinCoordinate:(CGFloat)proposedMin
+          ofSubviewAt:(NSInteger)dividerIndex {
+    return MAX(80.0, proposedMin);   // editor must stay at least 80 px tall
+}
+
+// No max constraint — allow user to drag divider all the way down (collapse)
+
+#pragma mark - FindResultsControllerDelegate
+
+- (void)findResultsController:(FindResultsController *)controller
+          didSelectLineNumber:(NSInteger)lineNumber {
+    [[self editorViewForDocument:_mutableActiveDocument] gotoLine:lineNumber];
+}
+
+- (void)findResultsControllerDidClose:(FindResultsController *)controller {
+    [self hideFindResults];
+}
+
+#pragma mark - FindReplacePanelFindAllDelegate
+
+- (void)findPanel:(FindReplacePanel *)panel
+       didFindAll:(NSArray<FindResultEntry *> *)results
+          forTerm:(NSString *)term {
+    if (results.count == 0) return;   // status already shown in the panel
+    [self showFindResultsWithResults:results term:term];
+}
+
+#pragma mark - Find Results Panel show / hide
+
+- (void)showFindResultsWithResults:(NSArray<FindResultEntry *> *)results
+                              term:(NSString *)term {
+    [_findResultsController showResults:results searchTerm:term];
+
+    // Expand the results panel if it is currently collapsed
+    if ([_editorSplitView isSubviewCollapsed:_findResultsController.view]) {
+        CGFloat totalH   = _editorSplitView.bounds.size.height;
+        CGFloat resultsH = MIN(200.0, totalH * 0.28);
+        [_editorSplitView setPosition:totalH - resultsH ofDividerAtIndex:0];
+    }
+}
+
+- (void)hideFindResults {
+    [_findResultsController clearResults];
+    CGFloat totalH = _editorSplitView.bounds.size.height;
+    [_editorSplitView setPosition:totalH ofDividerAtIndex:0];
 }
 
 #pragma mark - EditorViewDelegate

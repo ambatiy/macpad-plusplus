@@ -1,13 +1,15 @@
 #import <Cocoa/Cocoa.h>
 #import "MPDocument.h"
+#import "FindResultsController.h"
+#import "FindReplacePanel.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class EditorView;
 @class StatusBarController;
-@class FindReplacePanel;
 
 @interface MainWindowController : NSWindowController
+    <FindResultsControllerDelegate, FindReplacePanelFindAllDelegate>
 
 @property (nonatomic, strong, readonly) NSArray<MPDocument *> *documents;
 @property (nonatomic, strong, nullable, readonly) MPDocument *activeDocument;
