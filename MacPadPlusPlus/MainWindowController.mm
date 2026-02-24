@@ -11,6 +11,22 @@
 - (void)addRecentFile:(NSURL *)url;
 @end
 
+// Toolbar item identifiers
+static NSString * const kToolbarNew         = @"ToolbarNew";
+static NSString * const kToolbarOpen        = @"ToolbarOpen";
+static NSString * const kToolbarSave        = @"ToolbarSave";
+static NSString * const kToolbarSaveAll     = @"ToolbarSaveAll";
+static NSString * const kToolbarCut         = @"ToolbarCut";
+static NSString * const kToolbarCopy        = @"ToolbarCopy";
+static NSString * const kToolbarPaste       = @"ToolbarPaste";
+static NSString * const kToolbarUndo        = @"ToolbarUndo";
+static NSString * const kToolbarRedo        = @"ToolbarRedo";
+static NSString * const kToolbarFind        = @"ToolbarFind";
+static NSString * const kToolbarFindReplace = @"ToolbarFindReplace";
+static NSString * const kToolbarZoomIn      = @"ToolbarZoomIn";
+static NSString * const kToolbarZoomOut     = @"ToolbarZoomOut";
+static NSString * const kToolbarZoomReset   = @"ToolbarZoomReset";
+
 // Tab button height
 static const CGFloat kTabBarHeight = 30.0;
 static const CGFloat kStatusBarHeight = 24.0;
@@ -178,7 +194,7 @@ static const CGFloat kTabMaxWidth = 220.0;
 
 #pragma mark - MainWindowController
 
-@interface MainWindowController () <EditorViewDelegate, NSWindowDelegate, NSSplitViewDelegate>
+@interface MainWindowController () <EditorViewDelegate, NSWindowDelegate, NSSplitViewDelegate, NSToolbarDelegate>
 @property (nonatomic, strong) NSMutableArray<MPDocument *> *mutableDocuments;
 @property (nonatomic, strong, nullable) MPDocument *mutableActiveDocument;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, EditorView *> *editorViews;
@@ -272,10 +288,115 @@ static const CGFloat kTabMaxWidth = 220.0;
 
 - (void)setupToolbar {
     _toolbar = [[NSToolbar alloc] initWithIdentifier:@"MainToolbar"];
-    _toolbar.delegate = (id<NSToolbarDelegate>)self;
+    _toolbar.delegate = self;
     _toolbar.displayMode = NSToolbarDisplayModeIconOnly;
-    _toolbar.sizeMode = NSToolbarSizeModeSmall;
+    _toolbar.sizeMode = NSToolbarSizeModeRegular;
+    _toolbar.allowsUserCustomization = YES;
+    _toolbar.autosavesConfiguration = YES;
     self.window.toolbar = _toolbar;
+}
+
+#pragma mark - NSToolbarDelegate
+
+- (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar {
+    return @[
+        kToolbarNew, kToolbarOpen, kToolbarSave, kToolbarSaveAll,
+        NSToolbarSeparatorItemIdentifier,
+        kToolbarCut, kToolbarCopy, kToolbarPaste,
+        NSToolbarSeparatorItemIdentifier,
+        kToolbarUndo, kToolbarRedo,
+        NSToolbarSeparatorItemIdentifier,
+        kToolbarFind, kToolbarFindReplace,
+        NSToolbarSeparatorItemIdentifier,
+        kToolbarZoomIn, kToolbarZoomOut, kToolbarZoomReset,
+    ];
+}
+
+- (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar {
+    return @[
+        kToolbarNew, kToolbarOpen, kToolbarSave, kToolbarSaveAll,
+        kToolbarCut, kToolbarCopy, kToolbarPaste,
+        kToolbarUndo, kToolbarRedo,
+        kToolbarFind, kToolbarFindReplace,
+        kToolbarZoomIn, kToolbarZoomOut, kToolbarZoomReset,
+        NSToolbarSeparatorItemIdentifier,
+        NSToolbarSpaceItemIdentifier,
+        NSToolbarFlexibleSpaceItemIdentifier,
+    ];
+}
+
+- (NSToolbarItem *)toolbar:(NSToolbar *)toolbar
+     itemForItemIdentifier:(NSToolbarItemIdentifier)itemIdentifier
+ willBeInsertedIntoToolbar:(BOOL)flag {
+
+    // Helper block to create a standard icon+label toolbar item
+    NSToolbarItem *(^makeItem)(NSString *, NSString *, NSString *, SEL) =
+    ^NSToolbarItem *(NSString *ident, NSString *label, NSString *symbol, SEL action) {
+        NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:ident];
+        item.label          = label;
+        item.paletteLabel   = label;
+        item.toolTip        = label;
+        item.image          = [NSImage imageWithSystemSymbolName:symbol
+                                        accessibilityDescription:label];
+        item.target         = self;
+        item.action         = action;
+        return item;
+    };
+
+    if ([itemIdentifier isEqualToString:kToolbarNew]) {
+        return makeItem(kToolbarNew, @"New", @"doc.badge.plus", @selector(newDocument:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarOpen]) {
+        return makeItem(kToolbarOpen, @"Open", @"folder", @selector(openDocument:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarSave]) {
+        return makeItem(kToolbarSave, @"Save", @"square.and.arrow.down", @selector(saveDocument:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarSaveAll]) {
+        return makeItem(kToolbarSaveAll, @"Save All", @"square.and.arrow.down.on.square", @selector(saveAllDocuments:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarCut]) {
+        NSToolbarItem *item = makeItem(kToolbarCut, @"Cut", @"scissors", @selector(cut:));
+        item.target = nil;   // targets first responder
+        return item;
+    }
+    if ([itemIdentifier isEqualToString:kToolbarCopy]) {
+        NSToolbarItem *item = makeItem(kToolbarCopy, @"Copy", @"doc.on.doc", @selector(copy:));
+        item.target = nil;
+        return item;
+    }
+    if ([itemIdentifier isEqualToString:kToolbarPaste]) {
+        NSToolbarItem *item = makeItem(kToolbarPaste, @"Paste", @"doc.on.clipboard", @selector(paste:));
+        item.target = nil;
+        return item;
+    }
+    if ([itemIdentifier isEqualToString:kToolbarUndo]) {
+        NSToolbarItem *item = makeItem(kToolbarUndo, @"Undo", @"arrow.uturn.backward", @selector(undo:));
+        item.target = nil;
+        return item;
+    }
+    if ([itemIdentifier isEqualToString:kToolbarRedo]) {
+        NSToolbarItem *item = makeItem(kToolbarRedo, @"Redo", @"arrow.uturn.forward", @selector(redo:));
+        item.target = nil;
+        return item;
+    }
+    if ([itemIdentifier isEqualToString:kToolbarFind]) {
+        return makeItem(kToolbarFind, @"Find", @"magnifyingglass", @selector(showFindPanel:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarFindReplace]) {
+        return makeItem(kToolbarFindReplace, @"Find & Replace", @"arrow.triangle.2.circlepath",
+                        @selector(showFindAndReplacePanel:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarZoomIn]) {
+        return makeItem(kToolbarZoomIn, @"Zoom In", @"plus.magnifyingglass", @selector(zoomIn:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarZoomOut]) {
+        return makeItem(kToolbarZoomOut, @"Zoom Out", @"minus.magnifyingglass", @selector(zoomOut:));
+    }
+    if ([itemIdentifier isEqualToString:kToolbarZoomReset]) {
+        return makeItem(kToolbarZoomReset, @"Reset Zoom", @"1.magnifyingglass", @selector(zoomReset:));
+    }
+    return nil;
 }
 
 #pragma mark - Document Management
@@ -590,6 +711,19 @@ static const CGFloat kTabMaxWidth = 220.0;
     constrainMinCoordinate:(CGFloat)proposedMin
           ofSubviewAt:(NSInteger)dividerIndex {
     return MAX(80.0, proposedMin);   // editor must stay at least 80 px tall
+}
+
+// Hide the 1-px divider line when find results are collapsed (fixes "black line" bug)
+- (BOOL)splitView:(NSSplitView *)splitView shouldHideDividerAtIndex:(NSInteger)dividerIndex {
+    return [splitView isSubviewCollapsed:_findResultsController.view];
+}
+
+// Enlarge the invisible hit-test area around the thin divider so users can grab it easily
+- (NSRect)splitView:(NSSplitView *)splitView
+      effectiveRect:(NSRect)proposedEffectiveRect
+        forDrawnRect:(NSRect)drawnRect
+   ofDividerAtIndex:(NSInteger)dividerIndex {
+    return NSInsetRect(proposedEffectiveRect, 0, -5);
 }
 
 // No max constraint — allow user to drag divider all the way down (collapse)

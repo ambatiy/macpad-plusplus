@@ -59,13 +59,15 @@ static NSString * const kColText = @"text";
     _headerLabel.autoresizingMask = NSViewWidthSizable;
     [header addSubview:_headerLabel];
 
-    // Close button (×)
-    NSButton *closeBtn = [NSButton buttonWithTitle:@"✕"
-                                            target:self
-                                            action:@selector(closeResults)];
-    closeBtn.bezelStyle = NSBezelStyleInline;
-    closeBtn.font = [NSFont systemFontOfSize:10];
-    closeBtn.frame = NSMakeRect(root.bounds.size.width - 30, 3, 22, 20);
+    // Close button — circle X icon, no border, adapts to light/dark mode
+    NSButton *closeBtn = [[NSButton alloc] initWithFrame:NSMakeRect(root.bounds.size.width - 28, 3, 20, 20)];
+    closeBtn.image = [NSImage imageWithSystemSymbolName:@"xmark.circle.fill"
+                                 accessibilityDescription:@"Close Find Results"];
+    closeBtn.bezelStyle  = NSBezelStyleInline;
+    closeBtn.bordered    = NO;
+    closeBtn.imagePosition = NSImageOnly;
+    closeBtn.target      = self;
+    closeBtn.action      = @selector(closeResults);
     closeBtn.autoresizingMask = NSViewMinXMargin;
     [header addSubview:closeBtn];
 

@@ -33,6 +33,13 @@
     [_scintillaView setDelegate:self];
     [self addSubview:_scintillaView];
 
+    // Remove the default border from Scintilla's internal NSScrollView
+    for (NSView *sub in _scintillaView.subviews) {
+        if ([sub isKindOfClass:[NSScrollView class]]) {
+            [(NSScrollView *)sub setBorderType:NSNoBorder];
+        }
+    }
+
     _fontName = @"Menlo";
     _fontSize = 12.0;
     _tabWidth = 4;
@@ -97,10 +104,9 @@
     [v setGeneralProperty:SCI_SETWRAPVISUALFLAGS value:SC_WRAPVISUALFLAG_END];
     [v setGeneralProperty:SCI_SETWRAPINDENTMODE value:SC_WRAPINDENT_INDENT];
 
-    // --- Caret ---
-    [v setGeneralProperty:SCI_SETCARETLINEVISIBLE value:(_highlightCurrentLine ? 1 : 0)];
-    [v setGeneralProperty:SCI_SETCARETLINEVISIBLEALWAYS value:1];
-    [v setGeneralProperty:SCI_SETCARETWIDTH value:2];
+    // --- Caret: blinking cursor only, no full-row background highlight ---
+    [v setGeneralProperty:SCI_SETCARETLINEVISIBLE value:0];  // disable row highlight
+    [v setGeneralProperty:SCI_SETCARETWIDTH value:2];        // 2 px blinking insertion cursor
 
     // --- Whitespace & EOL ---
     [v setGeneralProperty:SCI_SETVIEWWS value:(_showWhitespace ? SCWS_VISIBLEALWAYS : SCWS_INVISIBLE)];
@@ -314,7 +320,8 @@
 
 - (void)setHighlightCurrentLine:(BOOL)highlightCurrentLine {
     _highlightCurrentLine = highlightCurrentLine;
-    [_scintillaView setGeneralProperty:SCI_SETCARETLINEVISIBLE value:(highlightCurrentLine ? 1 : 0)];
+    // Caret line row highlight is disabled in favour of blinking cursor only
+    [_scintillaView setGeneralProperty:SCI_SETCARETLINEVISIBLE value:0];
 }
 
 - (void)setFontSize:(CGFloat)fontSize {

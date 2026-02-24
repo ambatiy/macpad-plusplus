@@ -137,21 +137,7 @@ static SyntaxHighlighter *sSharedHighlighter = nil;
                       number:numberColor operator:operatorColor preprocessor:preprocessorColor
                         type:typeColor fg:fgColor bg:bgColor];
 
-    // Set caret line highlight
-    NSColor *caretLineBg = (theme == MPColorThemeDefault)
-        ? RGB_COLOR(232, 242, 254)
-        : [bgColor colorWithAlphaComponent:0.0]; // Transparent for dark themes
-    if (theme != MPColorThemeDefault) {
-        // Use a subtle highlight for dark themes
-        CGFloat r, g, b, a;
-        [bgColor getRed:&r green:&g blue:&b alpha:&a];
-        caretLineBg = [NSColor colorWithRed:MIN(r + 0.05, 1.0)
-                                      green:MIN(g + 0.05, 1.0)
-                                       blue:MIN(b + 0.05, 1.0) alpha:1.0];
-    }
-    [editor setColorProperty:SCI_SETCARETLINEBACK parameter:0 value:caretLineBg];
-
-    // Set caret color
+    // Set caret color (no row highlight — EditorView disables SCI_SETCARETLINEVISIBLE)
     [editor setColorProperty:SCI_SETCARETFORE parameter:0 value:fgColor];
 
     // Selection color

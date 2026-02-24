@@ -26,6 +26,7 @@ Scintilla, and Lexilla.
 | **File operations** | Open, Save, Save As, Save All, Reload from Disk, recent files |
 | **Encoding & line endings** | Detect and convert UTF-8 / UTF-8 BOM / UTF-16; LF / CRLF / CR |
 | **Preferences** | Font family, size, tab width, theme, editor toggles |
+| **Toolbar** | Notepad++-style icon toolbar: New, Open, Save, Save All, Cut, Copy, Paste, Undo, Redo, Find, Find & Replace, Zoom In/Out/Reset — user-customisable |
 | **App icon** | Custom MacPad++ icon (dark-blue background, paper document, green `++`) |
 | **macOS integration** | Retina-ready, dark mode, Services, drag-and-drop file open |
 
