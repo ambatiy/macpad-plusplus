@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>MacPadPlusPlus</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.macpad.MacPadPlusPlus</string>
+    <key>CFBundleName</key>
+    <string>MacPad++</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacPad++</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSMainNibFile</key>
+    <string></string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Plain Text</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.text</string>
+                <string>public.source-code</string>
+                <string>public.plain-text</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>txt</string><string>c</string><string>cpp</string><string>cc</string>
+                <string>cxx</string><string>h</string><string>hpp</string><string>mm</string>
+                <string>m</string><string>py</string><string>js</string><string>ts</string>
+                <string>jsx</string><string>tsx</string><string>html</string><string>htm</string>
+                <string>xml</string><string>css</string><string>json</string><string>md</string>
+                <string>sh</string><string>bash</string><string>zsh</string><string>rb</string>
+                <string>java</string><string>cs</string><string>swift</string><string>go</string>
+                <string>rs</string><string>php</string><string>sql</string><string>lua</string>
+                <string>pl</string><string>r</string><string>yaml</string><string>yml</string>
+                <string>toml</string><string>cmake</string><string>makefile</string>
+                <string>bat</string><string>cmd</string><string>ps1</string><string>asm</string>
+                <string>diff</string><string>patch</string><string>ini</string><string>cfg</string>
+                <string>conf</string><string>log</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 MacPad++ Contributors. GPL v3.</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+</dict>
+</plist>
