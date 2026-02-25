@@ -24,48 +24,8 @@ static NSString * const kColText = @"text";
     root.wantsLayer = YES;
     _results = [NSMutableArray new];
 
-    // ── Header bar ────────────────────────────────────────────────────────────
+    // ── Header bar constants ───────────────────────────────────────────────────
     static const CGFloat kHeaderH = 28.0;
-
-    NSView *header = [[NSView alloc] initWithFrame:NSMakeRect(0, root.bounds.size.height - kHeaderH,
-                                                              root.bounds.size.width, kHeaderH)];
-    header.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
-
-    // Background — visual effect view (standard panel header, works in light + dark)
-    NSVisualEffectView *headerBg = [[NSVisualEffectView alloc] initWithFrame:header.bounds];
-    headerBg.material = NSVisualEffectMaterialWindowBackground;
-    headerBg.blendingMode = NSVisualEffectBlendingModeWithinWindow;
-    headerBg.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [header addSubview:headerBg];
-
-    // Separator at the bottom edge of the header (divides header from table)
-    NSView *divider = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, root.bounds.size.width, 1)];
-    divider.wantsLayer = YES;
-    divider.layer.backgroundColor = [NSColor separatorColor].CGColor;
-    divider.autoresizingMask = NSViewWidthSizable;
-    [header addSubview:divider];
-
-    // Header label
-    _headerLabel = [NSTextField labelWithString:@"Find Results"];
-    _headerLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
-    _headerLabel.textColor = [NSColor secondaryLabelColor];
-    _headerLabel.frame = NSMakeRect(8, (kHeaderH - 16) / 2, 620, 16);
-    _headerLabel.autoresizingMask = NSViewWidthSizable;
-    [header addSubview:_headerLabel];
-
-    // Close button — small labelled button, clearly visible in any theme
-    NSButton *closeBtn = [NSButton buttonWithTitle:@"Close"
-                                            target:self
-                                            action:@selector(closeResults)];
-    closeBtn.controlSize = NSControlSizeSmall;
-    closeBtn.font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
-    CGFloat btnW = 50, btnH = 18;
-    closeBtn.frame = NSMakeRect(root.bounds.size.width - btnW - 6,
-                                (kHeaderH - btnH) / 2, btnW, btnH);
-    closeBtn.autoresizingMask = NSViewMinXMargin;
-    [header addSubview:closeBtn];
-
-    [root addSubview:header];
 
     // ── Table inside a scroll view ────────────────────────────────────────────
     _tableView = [[NSTableView alloc] init];
@@ -102,7 +62,47 @@ static NSString * const kColText = @"text";
     _scrollView.hasHorizontalScroller = NO;
     _scrollView.autohidesScrollers    = YES;
     _scrollView.autoresizingMask      = NSViewWidthSizable | NSViewHeightSizable;
+    // Add scroll view FIRST so the header (added next) is on top in z-order
     [root addSubview:_scrollView];
+
+    // ── Header bar (added LAST so it is always on top) ────────────────────────
+    NSView *header = [[NSView alloc] initWithFrame:NSMakeRect(0, root.bounds.size.height - kHeaderH,
+                                                              root.bounds.size.width, kHeaderH)];
+    header.wantsLayer = YES;
+    header.layer.backgroundColor = [NSColor controlBackgroundColor].CGColor;
+    header.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+
+    // Top separator line (between table and header)
+    NSView *divider = [[NSView alloc] initWithFrame:NSMakeRect(0, kHeaderH - 1,
+                                                              root.bounds.size.width, 1)];
+    divider.wantsLayer = YES;
+    divider.layer.backgroundColor = [NSColor separatorColor].CGColor;
+    divider.autoresizingMask = NSViewWidthSizable;
+    [header addSubview:divider];
+
+    // Label
+    _headerLabel = [NSTextField labelWithString:@"Find Results"];
+    _headerLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
+    _headerLabel.textColor = [NSColor secondaryLabelColor];
+    _headerLabel.frame = NSMakeRect(8, (kHeaderH - 16) / 2, root.bounds.size.width - 80, 16);
+    _headerLabel.autoresizingMask = NSViewWidthSizable;
+    [header addSubview:_headerLabel];
+
+    // Close button — uses [NSButton buttonWithTitle:] factory which properly
+    // configures the button cell; NSBezelStyleInline renders cleanly in panels
+    NSButton *closeBtn = [NSButton buttonWithTitle:@"✕ Close"
+                                            target:self
+                                            action:@selector(closeResults)];
+    closeBtn.controlSize  = NSControlSizeSmall;
+    closeBtn.bezelStyle   = NSBezelStyleRoundRect;
+    closeBtn.font         = [NSFont systemFontOfSize:11];
+    CGFloat bW = 64, bH = 18;
+    closeBtn.frame        = NSMakeRect(root.bounds.size.width - bW - 6,
+                                       (kHeaderH - bH) / 2, bW, bH);
+    closeBtn.autoresizingMask = NSViewMinXMargin;
+    [header addSubview:closeBtn];
+
+    [root addSubview:header];  // on top of scrollView
 
     self.view = root;
 }

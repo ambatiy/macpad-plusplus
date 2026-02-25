@@ -6,24 +6,25 @@
 static FindReplacePanel *sSharedPanel = nil;
 
 @interface FindReplacePanel ()
-// Find row
+// Find row container (moveable between find/replace modes)
+@property (nonatomic, strong) NSView      *findRowView;
 @property (nonatomic, strong) NSTextField *findField;
-@property (nonatomic, strong) NSButton *findNextBtn;
-@property (nonatomic, strong) NSButton *findPrevBtn;
-@property (nonatomic, strong) NSButton *findAllBtn;
-@property (nonatomic, strong) NSButton *markAllBtn;
-// Replace row (shown in replace mode)
+@property (nonatomic, strong) NSButton    *findNextBtn;
+@property (nonatomic, strong) NSButton    *findPrevBtn;
+@property (nonatomic, strong) NSButton    *findAllBtn;
+@property (nonatomic, strong) NSButton    *markAllBtn;
+// Replace row (shown in replace mode, always at kReplaceRowY)
+@property (nonatomic, strong) NSView      *replaceRow;
 @property (nonatomic, strong) NSTextField *replaceField;
-@property (nonatomic, strong) NSButton *replaceBtn;
-@property (nonatomic, strong) NSButton *replaceAllBtn;
+@property (nonatomic, strong) NSButton    *replaceBtn;
+@property (nonatomic, strong) NSButton    *replaceAllBtn;
 // Options
-@property (nonatomic, strong) NSButton *matchCaseCheck;
-@property (nonatomic, strong) NSButton *wholeWordCheck;
-@property (nonatomic, strong) NSButton *regexCheck;
-@property (nonatomic, strong) NSButton *wrapAroundCheck;
+@property (nonatomic, strong) NSButton    *matchCaseCheck;
+@property (nonatomic, strong) NSButton    *wholeWordCheck;
+@property (nonatomic, strong) NSButton    *regexCheck;
+@property (nonatomic, strong) NSButton    *wrapAroundCheck;
 // Status
 @property (nonatomic, strong) NSTextField *statusLabel;
-@property (nonatomic, strong) NSView *replaceRow;
 @property (nonatomic, assign) BOOL isReplaceMode;
 @end
 
@@ -44,100 +45,135 @@ static FindReplacePanel *sSharedPanel = nil;
 }
 
 - (void)setupUI {
+    // ── Row layout (y measured from bottom of content view) ──────────────────
+    //
+    //  Find mode (content h=116):
+    //   y=10   [x]Match case  [x]Whole word  [x]Regex  [x]Wrap
+    //   y=40   [Find All]  [Mark All]  <status label>
+    //   y=70   Find: [___________________field___________] [Find Next] [FindPrev]
+    //
+    //  Find & Replace mode (content h=148):
+    //   y=10   [x]Match case  [x]Whole word  [x]Regex  [x]Wrap
+    //   y=40   [Find All]  [Mark All]  <status label>
+    //   y=70   Replace: [_________________field__________] [Replace] [Repl.All]
+    //   y=102  Find:    [_________________field__________] [FindNext] [FindPrev]
+    //
+    //  The replaceRow sits at fixed y=70; the findRowView moves from y=70
+    //  (find mode) to y=102 (replace mode) via showFindMode / showFindAndReplaceMode.
+
     self.title = @"Find";
     self.level = NSFloatingWindowLevel;
-    [self setMinSize:NSMakeSize(460, 100)];
+    [self setMinSize:NSMakeSize(500, 100)];
     [self center];
 
     NSView *content = self.contentView;
 
-    // --- Find row ---
-    NSTextField *findLbl = [NSTextField labelWithString:@"Find:"];
-    findLbl.frame = NSMakeRect(12, 88, 55, 20);
-    [content addSubview:findLbl];
+    // Geometry constants (based on default window width 560)
+    static const CGFloat kW  = 548;   // usable width
+    static const CGFloat kBW = 90;    // button width
+    static const CGFloat kLW = 64;    // label column width
+    static const CGFloat kFX = 78;    // field x-start
+    // Field width = remaining after label, two buttons, and gaps
+    static const CGFloat kFW = kW - kFX - kBW * 2 - 8;
+    static const CGFloat kB1 = kFX + kFW + 4;   // first button x
+    static const CGFloat kB2 = kB1 + kBW + 4;   // second button x
 
-    _findField = [[NSTextField alloc] initWithFrame:NSMakeRect(72, 86, 340, 22)];
-    _findField.placeholderString = @"Search text";
-    _findField.autoresizingMask = NSViewWidthSizable;
-    [content addSubview:_findField];
+    // ── Options row (always at y=10) ─────────────────────────────────────────
+    _matchCaseCheck = [NSButton checkboxWithTitle:@"Match case" target:nil action:nil];
+    _matchCaseCheck.frame = NSMakeRect(12, 10, 108, 20);
+    [content addSubview:_matchCaseCheck];
 
-    _findNextBtn = [NSButton buttonWithTitle:@"Find Next" target:self action:@selector(findNext)];
-    _findNextBtn.frame = NSMakeRect(420, 86, 120, 22);
-    _findNextBtn.autoresizingMask = NSViewMinXMargin;
-    _findNextBtn.keyEquivalent = @"\r";
-    [content addSubview:_findNextBtn];
+    _wholeWordCheck = [NSButton checkboxWithTitle:@"Whole word" target:nil action:nil];
+    _wholeWordCheck.frame = NSMakeRect(126, 10, 108, 20);
+    [content addSubview:_wholeWordCheck];
 
-    _findPrevBtn = [NSButton buttonWithTitle:@"Find Prev" target:self action:@selector(findPrevious)];
-    _findPrevBtn.frame = NSMakeRect(420, 62, 120, 22);
-    _findPrevBtn.autoresizingMask = NSViewMinXMargin;
-    [content addSubview:_findPrevBtn];
+    _regexCheck = [NSButton checkboxWithTitle:@"Regex" target:nil action:nil];
+    _regexCheck.frame = NSMakeRect(240, 10, 80, 20);
+    [content addSubview:_regexCheck];
 
+    _wrapAroundCheck = [NSButton checkboxWithTitle:@"Wrap around" target:nil action:nil];
+    _wrapAroundCheck.frame = NSMakeRect(326, 10, 120, 20);
+    _wrapAroundCheck.state = NSControlStateValueOn;
+    [content addSubview:_wrapAroundCheck];
+
+    // ── Find All / Mark All row (always at y=40) ──────────────────────────────
     _findAllBtn = [NSButton buttonWithTitle:@"Find All" target:self action:@selector(findAll)];
-    _findAllBtn.frame = NSMakeRect(296, 62, 110, 22);
-    _findAllBtn.autoresizingMask = NSViewMinXMargin;
+    _findAllBtn.frame = NSMakeRect(12, 40, 88, 22);
     [content addSubview:_findAllBtn];
 
     _markAllBtn = [NSButton buttonWithTitle:@"Mark All" target:self action:@selector(markAll)];
-    _markAllBtn.frame = NSMakeRect(296, 38, 110, 22);
-    _markAllBtn.autoresizingMask = NSViewMinXMargin;
+    _markAllBtn.frame = NSMakeRect(106, 40, 88, 22);
     [content addSubview:_markAllBtn];
 
-    // --- Replace row (hidden by default) ---
-    _replaceRow = [[NSView alloc] initWithFrame:NSMakeRect(0, 60, 540, 24)];
+    _statusLabel = [NSTextField labelWithString:@""];
+    _statusLabel.frame = NSMakeRect(200, 43, kW - 200, 16);
+    _statusLabel.textColor = [NSColor tertiaryLabelColor];
+    _statusLabel.font = [NSFont systemFontOfSize:11];
+    _statusLabel.autoresizingMask = NSViewWidthSizable;
+    [content addSubview:_statusLabel];
+
+    // ── Replace row (y=70, hidden by default) ─────────────────────────────────
+    _replaceRow = [[NSView alloc] initWithFrame:NSMakeRect(0, 70, kW + 12, 28)];
     _replaceRow.autoresizingMask = NSViewWidthSizable;
     _replaceRow.hidden = YES;
 
     NSTextField *replaceLbl = [NSTextField labelWithString:@"Replace:"];
-    replaceLbl.frame = NSMakeRect(12, 0, 55, 20);
+    replaceLbl.frame = NSMakeRect(12, 4, kLW, 20);
     [_replaceRow addSubview:replaceLbl];
 
-    _replaceField = [[NSTextField alloc] initWithFrame:NSMakeRect(72, 0, 220, 22)];
+    _replaceField = [[NSTextField alloc] initWithFrame:NSMakeRect(kFX, 3, kFW, 22)];
     _replaceField.placeholderString = @"Replace with";
     _replaceField.autoresizingMask = NSViewWidthSizable;
     [_replaceRow addSubview:_replaceField];
 
     _replaceBtn = [NSButton buttonWithTitle:@"Replace" target:self action:@selector(replace)];
-    _replaceBtn.frame = NSMakeRect(300, 0, 90, 22);
+    _replaceBtn.frame = NSMakeRect(kB1, 3, kBW, 22);
+    _replaceBtn.autoresizingMask = NSViewMinXMargin;
     [_replaceRow addSubview:_replaceBtn];
 
     _replaceAllBtn = [NSButton buttonWithTitle:@"Replace All" target:self action:@selector(replaceAll)];
-    _replaceAllBtn.frame = NSMakeRect(396, 0, 110, 22);
+    _replaceAllBtn.frame = NSMakeRect(kB2, 3, kBW, 22);
+    _replaceAllBtn.autoresizingMask = NSViewMinXMargin;
     [_replaceRow addSubview:_replaceAllBtn];
 
     [content addSubview:_replaceRow];
 
-    // --- Options row ---
-    _matchCaseCheck = [NSButton checkboxWithTitle:@"Match case" target:nil action:nil];
-    _matchCaseCheck.frame = NSMakeRect(12, 10, 110, 20);
-    [content addSubview:_matchCaseCheck];
+    // ── Find row container (starts at y=70; moves to y=102 in replace mode) ──
+    _findRowView = [[NSView alloc] initWithFrame:NSMakeRect(0, 70, kW + 12, 28)];
+    _findRowView.autoresizingMask = NSViewWidthSizable;
 
-    _wholeWordCheck = [NSButton checkboxWithTitle:@"Whole word" target:nil action:nil];
-    _wholeWordCheck.frame = NSMakeRect(128, 10, 110, 20);
-    [content addSubview:_wholeWordCheck];
+    NSTextField *findLbl = [NSTextField labelWithString:@"Find:"];
+    findLbl.frame = NSMakeRect(12, 4, kLW, 20);
+    [_findRowView addSubview:findLbl];
 
-    _regexCheck = [NSButton checkboxWithTitle:@"Regular expression" target:nil action:nil];
-    _regexCheck.frame = NSMakeRect(244, 10, 155, 20);
-    [content addSubview:_regexCheck];
+    _findField = [[NSTextField alloc] initWithFrame:NSMakeRect(kFX, 3, kFW, 22)];
+    _findField.placeholderString = @"Search text";
+    _findField.autoresizingMask = NSViewWidthSizable;
+    [_findRowView addSubview:_findField];
 
-    _wrapAroundCheck = [NSButton checkboxWithTitle:@"Wrap around" target:nil action:nil];
-    _wrapAroundCheck.frame = NSMakeRect(404, 10, 120, 20);
-    _wrapAroundCheck.state = NSControlStateValueOn;
-    [content addSubview:_wrapAroundCheck];
+    _findNextBtn = [NSButton buttonWithTitle:@"Find Next" target:self action:@selector(findNext)];
+    _findNextBtn.frame = NSMakeRect(kB1, 3, kBW, 22);
+    _findNextBtn.autoresizingMask = NSViewMinXMargin;
+    _findNextBtn.keyEquivalent = @"\r";
+    [_findRowView addSubview:_findNextBtn];
 
-    // Status label
-    _statusLabel = [NSTextField labelWithString:@""];
-    _statusLabel.frame = NSMakeRect(72, 64, 200, 18);
-    _statusLabel.textColor = [NSColor tertiaryLabelColor];
-    _statusLabel.font = [NSFont systemFontOfSize:11];
-    _statusLabel.autoresizingMask = NSViewWidthSizable;
-    [content addSubview:_statusLabel];
+    _findPrevBtn = [NSButton buttonWithTitle:@"Find Prev" target:self action:@selector(findPrevious)];
+    _findPrevBtn.frame = NSMakeRect(kB2, 3, kBW, 22);
+    _findPrevBtn.autoresizingMask = NSViewMinXMargin;
+    [_findRowView addSubview:_findPrevBtn];
+
+    [content addSubview:_findRowView];
 }
 
 - (void)showFindMode {
     self.title = @"Find";
     _isReplaceMode = NO;
     _replaceRow.hidden = YES;
-    [self setContentSize:NSMakeSize(self.frame.size.width, 118)];
+    // Find row sits at y=70 in find-only mode
+    NSRect fr = _findRowView.frame;
+    fr.origin.y = 70;
+    _findRowView.frame = fr;
+    [self setContentSize:NSMakeSize(self.frame.size.width, 116)];
     [self makeKeyAndOrderFront:nil];
     [self makeFirstResponder:_findField];
 }
@@ -145,8 +181,13 @@ static FindReplacePanel *sSharedPanel = nil;
 - (void)showFindAndReplaceMode {
     self.title = @"Find & Replace";
     _isReplaceMode = YES;
+    // Resize first so the find row lands in the right place
+    [self setContentSize:NSMakeSize(self.frame.size.width, 148)];
     _replaceRow.hidden = NO;
-    [self setContentSize:NSMakeSize(self.frame.size.width, 142)];
+    // Find row moves up to y=102 to make room for replace row at y=70
+    NSRect fr = _findRowView.frame;
+    fr.origin.y = 102;
+    _findRowView.frame = fr;
     [self makeKeyAndOrderFront:nil];
     [self makeFirstResponder:_findField];
 }

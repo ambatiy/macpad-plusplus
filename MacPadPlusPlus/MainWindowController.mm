@@ -291,10 +291,14 @@ static const CGFloat kTabMaxWidth = 220.0;
     _toolbar = [[NSToolbar alloc] initWithIdentifier:@"MainToolbar"];
     _toolbar.delegate = self;
     _toolbar.displayMode = NSToolbarDisplayModeIconOnly;
-    _toolbar.sizeMode = NSToolbarSizeModeRegular;
+    _toolbar.sizeMode = NSToolbarSizeModeSmall;   // compact — saves vertical space
     _toolbar.allowsUserCustomization = YES;
     _toolbar.autosavesConfiguration = YES;
     self.window.toolbar = _toolbar;
+    // Unify toolbar with the titlebar so it doesn't consume content-view height
+    if (@available(macOS 11.0, *)) {
+        self.window.toolbarStyle = NSWindowToolbarStyleUnifiedCompact;
+    }
 }
 
 #pragma mark - NSToolbarDelegate
@@ -513,13 +517,13 @@ static const CGFloat kTabMaxWidth = 220.0;
     // Remove tab
     [_tabBarView removeTabForDocument:document];
 
-    // Select adjacent tab
+    // Select adjacent tab, or close the window when the last tab is gone
     if (_mutableDocuments.count > 0) {
         NSInteger newIdx = MIN(idx, (NSInteger)_mutableDocuments.count - 1);
         [self selectDocument:_mutableDocuments[newIdx]];
     } else {
         _mutableActiveDocument = nil;
-        [self newDocument];
+        [self.window close];
     }
     return YES;
 }

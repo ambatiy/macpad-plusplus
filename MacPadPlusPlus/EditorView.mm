@@ -71,9 +71,9 @@
     // --- Font ---
     [v setFontName:_fontName size:(int)_fontSize bold:NO italic:NO];
 
-    // --- Line numbers margin ---
+    // --- Line numbers margin (auto-sized after font is applied) ---
     [v setGeneralProperty:SCI_SETMARGINTYPEN parameter:0 value:SC_MARGIN_NUMBER];
-    [v setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:(_showLineNumbers ? 50 : 0)];
+    [v setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:(_showLineNumbers ? 40 : 0)];
 
     // --- Fold margin ---
     [v setGeneralProperty:SCI_SETMARGINTYPEN parameter:2 value:SC_MARGIN_SYMBOL];
@@ -127,6 +127,13 @@
     [v setGeneralProperty:SCI_SETADDITIONALSELECTIONTYPING value:1];
     [v setGeneralProperty:SCI_SETMULTIPASTE value:1];
 
+    // --- Selection-match highlight (indicator 8 = first user indicator) ---
+    [v setGeneralProperty:SCI_INDICSETSTYLE        parameter:8 value:INDIC_ROUNDBOX];
+    [v setGeneralProperty:SCI_INDICSETFORE         parameter:8 value:0x0080FF];  // orange (BGR)
+    [v setGeneralProperty:SCI_INDICSETALPHA        parameter:8 value:80];
+    [v setGeneralProperty:SCI_INDICSETOUTLINEALPHA parameter:8 value:180];
+    [v setGeneralProperty:SCI_INDICSETUNDER        parameter:8 value:1];
+
     // --- EOL mode ---
     [v setGeneralProperty:SCI_SETEOLMODE value:SC_EOL_LF];
 
@@ -139,6 +146,9 @@
 
     // Apply default theme
     [[SyntaxHighlighter sharedHighlighter] applyTheme:MPColorThemeDefault toEditor:v language:@"none"];
+
+    // Size the line-number margin to fit the digit count
+    [self updateLineNumberMarginWidth];
 }
 
 - (void)preferencesChanged:(NSNotification *)notification {
@@ -294,7 +304,7 @@
 
 - (void)setShowLineNumbers:(BOOL)showLineNumbers {
     _showLineNumbers = showLineNumbers;
-    [_scintillaView setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:(showLineNumbers ? 50 : 0)];
+    [self updateLineNumberMarginWidth];
 }
 
 - (void)setShowWhitespace:(BOOL)showWhitespace {
@@ -486,6 +496,7 @@
                     _document.isModified = YES;
                 }
                 [_delegate editorViewContentChanged:self];
+                [self updateLineNumberMarginWidth];
             }
             break;
 
@@ -498,6 +509,9 @@
 
                 // Brace matching
                 [self updateBraceHighlight];
+
+                // Highlight all occurrences of the current selection
+                [self highlightMatchesForSelection];
             }
             break;
 
@@ -547,6 +561,72 @@
     } else {
         [_scintillaView message:SCI_BRACEHIGHLIGHT wParam:INVALID_POSITION lParam:INVALID_POSITION];
     }
+}
+
+- (void)updateLineNumberMarginWidth {
+    if (!_showLineNumbers) {
+        [_scintillaView setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:0];
+        return;
+    }
+    // Count digits in the line count and measure their pixel width via Scintilla
+    NSInteger lineCount = [_scintillaView message:SCI_GETLINECOUNT wParam:0 lParam:0];
+    NSInteger digits = 1;
+    NSInteger tmp = lineCount;
+    while (tmp >= 10) { tmp /= 10; digits++; }
+    // Build a placeholder string one digit wider than current max for headroom
+    NSMutableString *measureStr = [NSMutableString string];
+    for (NSInteger i = 0; i < digits + 1; i++) [measureStr appendString:@"9"];
+    NSInteger w = [_scintillaView message:SCI_TEXTWIDTH
+                                   wParam:STYLE_LINENUMBER
+                                   lParam:(sptr_t)[measureStr UTF8String]];
+    [_scintillaView setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:w + 4];
+}
+
+- (void)highlightMatchesForSelection {
+    ScintillaView *v = _scintillaView;
+    NSInteger docLen = [v message:SCI_GETLENGTH wParam:0 lParam:0];
+
+    // Always clear previous highlights
+    [v message:SCI_SETINDICATORCURRENT wParam:8 lParam:0];
+    [v message:SCI_INDICATORCLEARRANGE wParam:0 lParam:docLen];
+
+    if (docLen == 0) return;
+
+    NSInteger selStart = [v message:SCI_GETSELECTIONSTART wParam:0 lParam:0];
+    NSInteger selEnd   = [v message:SCI_GETSELECTIONEND   wParam:0 lParam:0];
+    NSInteger selLen   = selEnd - selStart;
+
+    // Need at least 1 character; skip unreasonably long selections
+    if (selLen < 1 || selLen > 500) return;
+
+    // Fetch the selected bytes
+    char *buf = (char *)malloc(selLen + 1);
+    buf[selLen] = '\0';
+    [v message:SCI_GETSELTEXT wParam:0 lParam:(sptr_t)buf];
+
+    // Reject multi-line selections
+    for (NSInteger i = 0; i < selLen; i++) {
+        if (buf[i] == '\r' || buf[i] == '\n') {
+            free(buf);
+            return;
+        }
+    }
+
+    // Find and mark all occurrences (case-sensitive)
+    [v message:SCI_SETSEARCHFLAGS wParam:SCFIND_MATCHCASE lParam:0];
+    [v message:SCI_SETTARGETSTART wParam:0      lParam:0];
+    [v message:SCI_SETTARGETEND   wParam:docLen lParam:0];
+
+    NSInteger pos;
+    while ((pos = [v message:SCI_SEARCHINTARGET wParam:selLen lParam:(sptr_t)buf]) >= 0) {
+        [v message:SCI_INDICATORFILLRANGE wParam:pos lParam:selLen];
+        NSInteger next = pos + selLen;
+        if (next >= docLen) break;
+        [v message:SCI_SETTARGETSTART wParam:next      lParam:0];
+        [v message:SCI_SETTARGETEND   wParam:docLen lParam:0];
+    }
+
+    free(buf);
 }
 
 - (void)autoIndent {
