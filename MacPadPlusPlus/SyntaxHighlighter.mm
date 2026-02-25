@@ -103,6 +103,110 @@ static SyntaxHighlighter *sSharedHighlighter = nil;
             lineNumBgColor = RGB_COLOR(7, 54, 66);
             break;
 
+        case MPColorThemeOneDarkPro:
+            bgColor        = RGB_COLOR(40, 44, 52);
+            fgColor        = RGB_COLOR(171, 178, 191);
+            keywordColor   = RGB_COLOR(198, 120, 221);
+            stringColor    = RGB_COLOR(152, 195, 121);
+            commentColor   = RGB_COLOR(92, 99, 112);
+            numberColor    = RGB_COLOR(209, 154, 102);
+            operatorColor  = RGB_COLOR(171, 178, 191);
+            preprocessorColor = RGB_COLOR(224, 108, 117);
+            typeColor      = RGB_COLOR(97, 175, 239);
+            lineNumBgColor = RGB_COLOR(33, 37, 43);
+            break;
+
+        case MPColorThemeDracula:
+            bgColor        = RGB_COLOR(40, 42, 54);
+            fgColor        = RGB_COLOR(248, 248, 242);
+            keywordColor   = RGB_COLOR(255, 121, 198);
+            stringColor    = RGB_COLOR(241, 250, 140);
+            commentColor   = RGB_COLOR(98, 114, 164);
+            numberColor    = RGB_COLOR(189, 147, 249);
+            operatorColor  = RGB_COLOR(255, 121, 198);
+            preprocessorColor = RGB_COLOR(139, 233, 253);
+            typeColor      = RGB_COLOR(139, 233, 253);
+            lineNumBgColor = RGB_COLOR(68, 71, 90);
+            break;
+
+        case MPColorThemeNord:
+            bgColor        = RGB_COLOR(46, 52, 64);
+            fgColor        = RGB_COLOR(216, 222, 233);
+            keywordColor   = RGB_COLOR(129, 161, 193);
+            stringColor    = RGB_COLOR(163, 190, 140);
+            commentColor   = RGB_COLOR(76, 86, 106);
+            numberColor    = RGB_COLOR(180, 142, 173);
+            operatorColor  = RGB_COLOR(129, 161, 193);
+            preprocessorColor = RGB_COLOR(136, 192, 208);
+            typeColor      = RGB_COLOR(143, 188, 187);
+            lineNumBgColor = RGB_COLOR(59, 66, 82);
+            break;
+
+        case MPColorThemeGruvboxDark:
+            bgColor        = RGB_COLOR(40, 40, 40);
+            fgColor        = RGB_COLOR(235, 219, 178);
+            keywordColor   = RGB_COLOR(251, 73, 52);
+            stringColor    = RGB_COLOR(184, 187, 38);
+            commentColor   = RGB_COLOR(146, 131, 116);
+            numberColor    = RGB_COLOR(211, 134, 155);
+            operatorColor  = RGB_COLOR(235, 219, 178);
+            preprocessorColor = RGB_COLOR(250, 189, 47);
+            typeColor      = RGB_COLOR(131, 165, 152);
+            lineNumBgColor = RGB_COLOR(60, 56, 54);
+            break;
+
+        case MPColorThemeGruvboxLight:
+            bgColor        = RGB_COLOR(251, 241, 199);
+            fgColor        = RGB_COLOR(60, 56, 54);
+            keywordColor   = RGB_COLOR(157, 0, 6);
+            stringColor    = RGB_COLOR(121, 116, 14);
+            commentColor   = RGB_COLOR(146, 131, 116);
+            numberColor    = RGB_COLOR(143, 63, 113);
+            operatorColor  = RGB_COLOR(60, 56, 54);
+            preprocessorColor = RGB_COLOR(181, 118, 20);
+            typeColor      = RGB_COLOR(66, 123, 88);
+            lineNumBgColor = RGB_COLOR(242, 229, 188);
+            break;
+
+        case MPColorThemeTomorrowNight:
+            bgColor        = RGB_COLOR(29, 31, 33);
+            fgColor        = RGB_COLOR(197, 200, 198);
+            keywordColor   = RGB_COLOR(178, 148, 187);
+            stringColor    = RGB_COLOR(181, 189, 104);
+            commentColor   = RGB_COLOR(150, 152, 150);
+            numberColor    = RGB_COLOR(222, 147, 95);
+            operatorColor  = RGB_COLOR(197, 200, 198);
+            preprocessorColor = RGB_COLOR(204, 102, 102);
+            typeColor      = RGB_COLOR(129, 162, 190);
+            lineNumBgColor = RGB_COLOR(40, 42, 46);
+            break;
+
+        case MPColorThemeCobalt2:
+            bgColor        = RGB_COLOR(25, 53, 73);
+            fgColor        = RGB_COLOR(255, 255, 255);
+            keywordColor   = RGB_COLOR(255, 157, 0);
+            stringColor    = RGB_COLOR(58, 217, 0);
+            commentColor   = RGB_COLOR(0, 136, 255);
+            numberColor    = RGB_COLOR(255, 98, 140);
+            operatorColor  = RGB_COLOR(255, 157, 0);
+            preprocessorColor = RGB_COLOR(128, 255, 187);
+            typeColor      = RGB_COLOR(158, 255, 255);
+            lineNumBgColor = RGB_COLOR(13, 58, 88);
+            break;
+
+        case MPColorThemeMaterialDark:
+            bgColor        = RGB_COLOR(38, 50, 56);
+            fgColor        = RGB_COLOR(205, 211, 222);
+            keywordColor   = RGB_COLOR(137, 221, 255);
+            stringColor    = RGB_COLOR(195, 232, 141);
+            commentColor   = RGB_COLOR(84, 110, 122);
+            numberColor    = RGB_COLOR(247, 140, 108);
+            operatorColor  = RGB_COLOR(137, 221, 255);
+            preprocessorColor = RGB_COLOR(199, 146, 234);
+            typeColor      = RGB_COLOR(255, 203, 107);
+            lineNumBgColor = RGB_COLOR(55, 71, 79);
+            break;
+
         default: // Light theme
             bgColor        = [NSColor whiteColor];
             fgColor        = [NSColor blackColor];

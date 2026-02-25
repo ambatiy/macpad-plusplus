@@ -16,20 +16,23 @@ NSString *const MPPrefRecentFiles        = @"recentFiles";
 static PreferencesWindowController *sSharedController = nil;
 
 @interface PreferencesWindowController ()
-@property (nonatomic, strong) NSTabView *tabView;
+@property (nonatomic, strong) NSTabView      *tabView;
 // Editor tab
-@property (nonatomic, strong) NSPopUpButton *fontPopup;
-@property (nonatomic, strong) NSTextField *fontSizeField;
-@property (nonatomic, strong) NSTextField *tabWidthField;
-@property (nonatomic, strong) NSButton *useSpacesCheck;
-@property (nonatomic, strong) NSButton *wordWrapCheck;
-@property (nonatomic, strong) NSButton *showLineNumCheck;
-@property (nonatomic, strong) NSButton *showWhitespaceCheck;
-@property (nonatomic, strong) NSButton *showIndentGuidesCheck;
-@property (nonatomic, strong) NSButton *showFoldingCheck;
-@property (nonatomic, strong) NSButton *highlightLineCheck;
+@property (nonatomic, strong) NSPopUpButton  *fontPopup;
+@property (nonatomic, strong) NSTextField    *fontSizeField;
+@property (nonatomic, strong) NSStepper      *fontSizeStepper;
+@property (nonatomic, strong) NSTextField    *tabWidthField;
+@property (nonatomic, strong) NSButton       *useSpacesCheck;
+@property (nonatomic, strong) NSButton       *wordWrapCheck;
+@property (nonatomic, strong) NSButton       *showLineNumCheck;
+@property (nonatomic, strong) NSButton       *showWhitespaceCheck;
+@property (nonatomic, strong) NSButton       *showIndentGuidesCheck;
+@property (nonatomic, strong) NSButton       *showFoldingCheck;
+@property (nonatomic, strong) NSButton       *highlightLineCheck;
 // Appearance tab
-@property (nonatomic, strong) NSPopUpButton *themePopup;
+@property (nonatomic, strong) NSPopUpButton  *themePopup;
+// For Cancel restore
+@property (nonatomic, strong) NSDictionary   *savedPrefsSnapshot;
 @end
 
 @implementation PreferencesWindowController
@@ -54,18 +57,18 @@ static PreferencesWindowController *sSharedController = nil;
 
 - (void)registerDefaults {
     [[NSUserDefaults standardUserDefaults] registerDefaults:@{
-        MPPrefFontName:           @"Menlo",
-        MPPrefFontSize:           @12,
-        MPPrefTabWidth:           @4,
-        MPPrefUseSpacesForTabs:   @NO,
-        MPPrefWordWrap:           @NO,
-        MPPrefShowLineNumbers:    @YES,
-        MPPrefShowWhitespace:     @NO,
-        MPPrefShowIndentGuides:   @YES,
-        MPPrefShowFolding:        @YES,
+        MPPrefFontName:             @"Menlo",
+        MPPrefFontSize:             @12,
+        MPPrefTabWidth:             @4,
+        MPPrefUseSpacesForTabs:     @NO,
+        MPPrefWordWrap:             @NO,
+        MPPrefShowLineNumbers:      @YES,
+        MPPrefShowWhitespace:       @NO,
+        MPPrefShowIndentGuides:     @YES,
+        MPPrefShowFolding:          @YES,
         MPPrefHighlightCurrentLine: @YES,
-        MPPrefColorTheme:         @0,
-        MPPrefRecentFiles:        @[],
+        MPPrefColorTheme:           @0,
+        MPPrefRecentFiles:          @[],
     }];
 }
 
@@ -94,9 +97,21 @@ static PreferencesWindowController *sSharedController = nil;
 
     y -= 32;
     [editorView addSubview:[self labelAt:NSMakePoint(labelX, y) text:@"Font Size:"]];
-    _fontSizeField = [[NSTextField alloc] initWithFrame:NSMakeRect(fieldX, y - 2, 60, 22)];
+    // Number-validated text field
+    _fontSizeField = [[NSTextField alloc] initWithFrame:NSMakeRect(fieldX, y - 2, 52, 22)];
     _fontSizeField.delegate = (id<NSTextFieldDelegate>)self;
+    NSNumberFormatter *fmt = [[NSNumberFormatter alloc] init];
+    fmt.numberStyle = NSNumberFormatterDecimalStyle;
+    fmt.minimum = @6; fmt.maximum = @72;
+    fmt.maximumFractionDigits = 0;
+    _fontSizeField.formatter = fmt;
     [editorView addSubview:_fontSizeField];
+    // Stepper paired with the field
+    _fontSizeStepper = [[NSStepper alloc] initWithFrame:NSMakeRect(fieldX + 54, y - 2, 20, 22)];
+    _fontSizeStepper.minValue = 6; _fontSizeStepper.maxValue = 72;
+    _fontSizeStepper.increment = 1; _fontSizeStepper.valueWraps = NO;
+    [_fontSizeStepper setTarget:self]; [_fontSizeStepper setAction:@selector(fontSizeStepperChanged:)];
+    [editorView addSubview:_fontSizeStepper];
 
     y -= 32;
     [editorView addSubview:[self labelAt:NSMakePoint(labelX, y) text:@"Tab Width:"]];
@@ -148,13 +163,26 @@ static PreferencesWindowController *sSharedController = nil;
 
     y = 270;
     [appearView addSubview:[self labelAt:NSMakePoint(labelX, y) text:@"Color Theme:"]];
-    _themePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(fieldX, y - 2, 200, 24)];
-    [_themePopup addItemsWithTitles:@[@"Default (Light)", @"Dark", @"Monokai", @"Solarized Light", @"Solarized Dark"]];
+    _themePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(fieldX, y - 2, 220, 24)];
+    [_themePopup addItemsWithTitles:@[
+        @"Default (Light)",
+        @"Dark",
+        @"Monokai",
+        @"Solarized Light",
+        @"Solarized Dark",
+        @"One Dark Pro",
+        @"Dracula",
+        @"Nord",
+        @"Gruvbox Dark",
+        @"Gruvbox Light",
+        @"Tomorrow Night",
+        @"Cobalt2",
+        @"Material Dark",
+    ]];
     [_themePopup setTarget:self]; [_themePopup setAction:@selector(prefsChanged:)];
     [appearView addSubview:_themePopup];
 
     [_tabView addTabViewItem:appearanceTab];
-
     [content addSubview:_tabView];
 
     // Buttons
@@ -181,19 +209,46 @@ static PreferencesWindowController *sSharedController = nil;
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSString *fontName = [d stringForKey:MPPrefFontName] ?: @"Menlo";
     [_fontPopup selectItemWithTitle:fontName];
-    _fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", [d doubleForKey:MPPrefFontSize] ?: 12];
-    _tabWidthField.stringValue = [NSString stringWithFormat:@"%ld", (long)[d integerForKey:MPPrefTabWidth] ?: 4];
-    _useSpacesCheck.state = [d boolForKey:MPPrefUseSpacesForTabs] ? NSControlStateValueOn : NSControlStateValueOff;
-    _wordWrapCheck.state = [d boolForKey:MPPrefWordWrap] ? NSControlStateValueOn : NSControlStateValueOff;
-    _showLineNumCheck.state = [d boolForKey:MPPrefShowLineNumbers] ? NSControlStateValueOn : NSControlStateValueOff;
-    _showWhitespaceCheck.state = [d boolForKey:MPPrefShowWhitespace] ? NSControlStateValueOn : NSControlStateValueOff;
+
+    double sz = [d doubleForKey:MPPrefFontSize] ?: 12;
+    _fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", sz];
+    _fontSizeStepper.doubleValue = sz;
+
+    _tabWidthField.stringValue = [NSString stringWithFormat:@"%ld", (long)([d integerForKey:MPPrefTabWidth] ?: 4)];
+    _useSpacesCheck.state   = [d boolForKey:MPPrefUseSpacesForTabs]     ? NSControlStateValueOn : NSControlStateValueOff;
+    _wordWrapCheck.state    = [d boolForKey:MPPrefWordWrap]              ? NSControlStateValueOn : NSControlStateValueOff;
+    _showLineNumCheck.state = [d boolForKey:MPPrefShowLineNumbers]       ? NSControlStateValueOn : NSControlStateValueOff;
+    _showWhitespaceCheck.state   = [d boolForKey:MPPrefShowWhitespace]   ? NSControlStateValueOn : NSControlStateValueOff;
     _showIndentGuidesCheck.state = [d boolForKey:MPPrefShowIndentGuides] ? NSControlStateValueOn : NSControlStateValueOff;
-    _showFoldingCheck.state = [d boolForKey:MPPrefShowFolding] ? NSControlStateValueOn : NSControlStateValueOff;
-    _highlightLineCheck.state = [d boolForKey:MPPrefHighlightCurrentLine] ? NSControlStateValueOn : NSControlStateValueOff;
+    _showFoldingCheck.state      = [d boolForKey:MPPrefShowFolding]      ? NSControlStateValueOn : NSControlStateValueOff;
+    _highlightLineCheck.state    = [d boolForKey:MPPrefHighlightCurrentLine] ? NSControlStateValueOn : NSControlStateValueOff;
     [_themePopup selectItemAtIndex:[d integerForKey:MPPrefColorTheme]];
 }
 
+// Snapshot current NSUserDefaults values so Cancel can restore them
+- (NSDictionary *)currentPrefsSnapshot {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    return @{
+        MPPrefFontName:             [d stringForKey:MPPrefFontName] ?: @"Menlo",
+        MPPrefFontSize:             @([d doubleForKey:MPPrefFontSize] ?: 12),
+        MPPrefTabWidth:             @([d integerForKey:MPPrefTabWidth] ?: 4),
+        MPPrefUseSpacesForTabs:     @([d boolForKey:MPPrefUseSpacesForTabs]),
+        MPPrefWordWrap:             @([d boolForKey:MPPrefWordWrap]),
+        MPPrefShowLineNumbers:      @([d boolForKey:MPPrefShowLineNumbers]),
+        MPPrefShowWhitespace:       @([d boolForKey:MPPrefShowWhitespace]),
+        MPPrefShowIndentGuides:     @([d boolForKey:MPPrefShowIndentGuides]),
+        MPPrefShowFolding:          @([d boolForKey:MPPrefShowFolding]),
+        MPPrefHighlightCurrentLine: @([d boolForKey:MPPrefHighlightCurrentLine]),
+        MPPrefColorTheme:           @([d integerForKey:MPPrefColorTheme]),
+    };
+}
+
 - (void)prefsChanged:(id)sender {
+    [self savePrefs];
+}
+
+- (void)fontSizeStepperChanged:(NSStepper *)stepper {
+    _fontSizeField.doubleValue = stepper.doubleValue;
     [self savePrefs];
 }
 
@@ -201,28 +256,50 @@ static PreferencesWindowController *sSharedController = nil;
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     [d setObject:_fontPopup.titleOfSelectedItem forKey:MPPrefFontName];
     [d setDouble:_fontSizeField.doubleValue forKey:MPPrefFontSize];
+    // Keep stepper in sync with typed value
+    double clamped = MAX(6, MIN(72, _fontSizeField.doubleValue));
+    _fontSizeStepper.doubleValue = clamped;
     [d setInteger:_tabWidthField.integerValue forKey:MPPrefTabWidth];
-    [d setBool:(_useSpacesCheck.state == NSControlStateValueOn) forKey:MPPrefUseSpacesForTabs];
-    [d setBool:(_wordWrapCheck.state == NSControlStateValueOn) forKey:MPPrefWordWrap];
+    [d setBool:(_useSpacesCheck.state   == NSControlStateValueOn) forKey:MPPrefUseSpacesForTabs];
+    [d setBool:(_wordWrapCheck.state    == NSControlStateValueOn) forKey:MPPrefWordWrap];
     [d setBool:(_showLineNumCheck.state == NSControlStateValueOn) forKey:MPPrefShowLineNumbers];
-    [d setBool:(_showWhitespaceCheck.state == NSControlStateValueOn) forKey:MPPrefShowWhitespace];
+    [d setBool:(_showWhitespaceCheck.state   == NSControlStateValueOn) forKey:MPPrefShowWhitespace];
     [d setBool:(_showIndentGuidesCheck.state == NSControlStateValueOn) forKey:MPPrefShowIndentGuides];
-    [d setBool:(_showFoldingCheck.state == NSControlStateValueOn) forKey:MPPrefShowFolding];
-    [d setBool:(_highlightLineCheck.state == NSControlStateValueOn) forKey:MPPrefHighlightCurrentLine];
+    [d setBool:(_showFoldingCheck.state      == NSControlStateValueOn) forKey:MPPrefShowFolding];
+    [d setBool:(_highlightLineCheck.state    == NSControlStateValueOn) forKey:MPPrefHighlightCurrentLine];
     [d setInteger:_themePopup.indexOfSelectedItem forKey:MPPrefColorTheme];
     [d synchronize];
 }
 
 - (void)closePrefs:(id)sender {
     [self savePrefs];
+    _savedPrefsSnapshot = nil;
     [self.window orderOut:nil];
 }
 
 - (void)cancel:(id)sender {
+    // Restore all settings to the values they had when the panel was opened
+    if (_savedPrefsSnapshot) {
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        [d setObject:_savedPrefsSnapshot[MPPrefFontName] forKey:MPPrefFontName];
+        [d setDouble:[_savedPrefsSnapshot[MPPrefFontSize] doubleValue] forKey:MPPrefFontSize];
+        [d setInteger:[_savedPrefsSnapshot[MPPrefTabWidth] integerValue] forKey:MPPrefTabWidth];
+        [d setBool:[_savedPrefsSnapshot[MPPrefUseSpacesForTabs] boolValue] forKey:MPPrefUseSpacesForTabs];
+        [d setBool:[_savedPrefsSnapshot[MPPrefWordWrap] boolValue] forKey:MPPrefWordWrap];
+        [d setBool:[_savedPrefsSnapshot[MPPrefShowLineNumbers] boolValue] forKey:MPPrefShowLineNumbers];
+        [d setBool:[_savedPrefsSnapshot[MPPrefShowWhitespace] boolValue] forKey:MPPrefShowWhitespace];
+        [d setBool:[_savedPrefsSnapshot[MPPrefShowIndentGuides] boolValue] forKey:MPPrefShowIndentGuides];
+        [d setBool:[_savedPrefsSnapshot[MPPrefShowFolding] boolValue] forKey:MPPrefShowFolding];
+        [d setBool:[_savedPrefsSnapshot[MPPrefHighlightCurrentLine] boolValue] forKey:MPPrefHighlightCurrentLine];
+        [d setInteger:[_savedPrefsSnapshot[MPPrefColorTheme] integerValue] forKey:MPPrefColorTheme];
+        [d synchronize];
+        _savedPrefsSnapshot = nil;
+    }
     [self.window orderOut:nil];
 }
 
 - (void)showPreferences {
+    _savedPrefsSnapshot = [self currentPrefsSnapshot];
     [self loadCurrentPrefs];
     [self showWindow:nil];
     [self.window makeKeyAndOrderFront:nil];

@@ -29,17 +29,39 @@
     _mainWindowController = [[MainWindowController alloc] init];
     [_mainWindowController showWindow:nil];
 
-    // Open new empty document
-    [_mainWindowController newDocument];
-
-    // Open files passed on command line (after first arg which is the app path)
+    // Collect any command-line file arguments
     NSArray<NSString *> *args = [[NSProcessInfo processInfo] arguments];
+    NSMutableArray *cmdFiles = [NSMutableArray new];
     for (NSUInteger i = 1; i < args.count; i++) {
         NSString *arg = args[i];
         if ([arg hasPrefix:@"-"]) continue;
-        NSURL *url = [NSURL fileURLWithPath:arg];
         if ([[NSFileManager defaultManager] fileExistsAtPath:arg]) {
-            [_mainWindowController openDocumentFromURL:url];
+            [cmdFiles addObject:arg];
+        }
+    }
+
+    if (cmdFiles.count > 0) {
+        // Command-line files take priority; don't restore session
+        for (NSString *path in cmdFiles) {
+            [_mainWindowController openDocumentFromURL:[NSURL fileURLWithPath:path]];
+        }
+    } else {
+        // Try to restore the previous session
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        NSArray *sessionPaths = [d arrayForKey:@"sessionFiles"];
+        [d removeObjectForKey:@"sessionFiles"]; // clear immediately so a crash doesn't loop
+
+        BOOL restored = NO;
+        NSFileManager *fm = [NSFileManager defaultManager];
+        for (NSString *path in sessionPaths) {
+            if ([fm fileExistsAtPath:path]) {
+                [_mainWindowController openDocumentFromURL:[NSURL fileURLWithPath:path]];
+                restored = YES;
+            }
+        }
+
+        if (!restored) {
+            [_mainWindowController newDocument];
         }
     }
 }
@@ -63,6 +85,19 @@
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     // Let the window controller handle unsaved changes
     return NSTerminateNow;
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    // Save paths of all open file-backed documents so the next launch can restore them
+    NSMutableArray *paths = [NSMutableArray new];
+    for (MPDocument *doc in _mainWindowController.documents) {
+        if (doc.fileURL && !doc.isNew) {
+            [paths addObject:doc.fileURL.path];
+        }
+    }
+    if (paths.count > 0) {
+        [[NSUserDefaults standardUserDefaults] setObject:paths forKey:@"sessionFiles"];
+    }
 }
 
 - (IBAction)newDocument:(id)sender {

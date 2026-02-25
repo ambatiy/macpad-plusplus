@@ -8,75 +8,109 @@
 @property (nonatomic, strong) NSTextField *encodingLabel;
 @property (nonatomic, strong) NSTextField *lineEndingLabel;
 @property (nonatomic, strong) NSTextField *linesLabel;
-@property (nonatomic, strong) NSView *separatorView;
 @end
 
 @implementation StatusBarController
 
 - (void)loadView {
-    NSView *v = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 800, 24)];
+    NSView *v = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 1024, 24)];
     v.wantsLayer = YES;
-    v.layer.backgroundColor = [NSColor colorNamed:@"controlBackgroundColor"] ?
-        [NSColor controlBackgroundColor].CGColor :
-        [NSColor colorWithRed:0.94 green:0.94 blue:0.94 alpha:1.0].CGColor;
+    v.layer.backgroundColor = [NSColor controlBackgroundColor].CGColor;
 
     // Top border
-    NSView *border = [[NSView alloc] initWithFrame:NSMakeRect(0, 23, 800, 1)];
+    NSView *border = [[NSView alloc] initWithFrame:NSMakeRect(0, 23, 1024, 1)];
     border.wantsLayer = YES;
     border.layer.backgroundColor = [NSColor separatorColor].CGColor;
     border.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     [v addSubview:border];
 
     // Create labels
-    _positionLabel = [self makeLabel:@"Ln 1, Col 1" x:8];
-    _selectionLabel = [self makeLabel:@"" x:140];
-    _languageLabel = [self makeLabel:@"Plain Text" x:320];
-    _encodingLabel = [self makeLabel:@"UTF-8" x:480];
-    _lineEndingLabel = [self makeLabel:@"Unix (LF)" x:570];
-    _linesLabel = [self makeLabel:@"Lines: 1" x:660];
+    _positionLabel   = [self makeLabel:@"Ln 1, Col 1"];
+    _selectionLabel  = [self makeLabel:@""];
+    _languageLabel   = [self makeLabel:@"Plain Text"];
+    _encodingLabel   = [self makeLabel:@"UTF-8"];
+    _lineEndingLabel = [self makeLabel:@"Unix (LF)"];
+    _linesLabel      = [self makeLabel:@"Lines: 1"];
 
-    for (NSTextField *lbl in @[_positionLabel, _selectionLabel, _languageLabel, _encodingLabel, _lineEndingLabel, _linesLabel]) {
-        [v addSubview:lbl];
-    }
+    // Left sub-stack: position | sel  (pinned to leading edge)
+    NSStackView *leftStack = [NSStackView stackViewWithViews:@[
+        _positionLabel, [self makeSepView], _selectionLabel
+    ]];
+    leftStack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    leftStack.spacing     = 6;
+    leftStack.alignment   = NSLayoutAttributeCenterY;
 
-    // Separators between sections
-    CGFloat sepXPositions[] = {135.0, 315.0, 475.0, 565.0, 655.0};
-    for (int si = 0; si < 5; si++) {
-        NSView *sep = [[NSView alloc] initWithFrame:NSMakeRect(sepXPositions[si], 4, 1, 16)];
-        sep.wantsLayer = YES;
-        sep.layer.backgroundColor = [NSColor separatorColor].CGColor;
-        [v addSubview:sep];
-    }
+    // Right sub-stack: language | encoding | line ending | lines  (pinned to trailing edge)
+    NSStackView *rightStack = [NSStackView stackViewWithViews:@[
+        _languageLabel,   [self makeSepView],
+        _encodingLabel,   [self makeSepView],
+        _lineEndingLabel, [self makeSepView],
+        _linesLabel
+    ]];
+    rightStack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    rightStack.spacing     = 6;
+    rightStack.alignment   = NSLayoutAttributeCenterY;
+
+    // Main container — gravity areas push left/right stacks to their respective edges
+    NSStackView *main = [[NSStackView alloc] initWithFrame:NSMakeRect(0, 0, 1024, 24)];
+    main.orientation   = NSUserInterfaceLayoutOrientationHorizontal;
+    main.distribution  = NSStackViewDistributionGravityAreas;
+    main.alignment     = NSLayoutAttributeCenterY;
+    main.edgeInsets    = NSEdgeInsetsMake(0, 8, 0, 8);
+    main.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [main addView:leftStack  inGravity:NSStackViewGravityLeading];
+    [main addView:rightStack inGravity:NSStackViewGravityTrailing];
+    [v addSubview:main];
 
     self.view = v;
 }
 
-- (NSTextField *)makeLabel:(NSString *)text x:(CGFloat)x {
+// Label without a fixed frame — NSStackView sizes it to intrinsic content
+- (NSTextField *)makeLabel:(NSString *)text {
     NSTextField *lbl = [NSTextField labelWithString:text];
-    lbl.font = [NSFont systemFontOfSize:11];
-    lbl.textColor = [NSColor secondaryLabelColor];
-    lbl.frame = NSMakeRect(x, 4, 170, 16);
-    lbl.autoresizingMask = NSViewMinYMargin;
+    lbl.font          = [NSFont systemFontOfSize:11];
+    lbl.textColor     = [NSColor secondaryLabelColor];
     lbl.lineBreakMode = NSLineBreakByTruncatingTail;
     return lbl;
 }
 
+// 1×16 px vertical separator with explicit size constraints for NSStackView
+- (NSView *)makeSepView {
+    NSView *sep = [[NSView alloc] initWithFrame:NSZeroRect];
+    sep.wantsLayer = YES;
+    sep.layer.backgroundColor = [NSColor separatorColor].CGColor;
+    [sep addConstraint:[NSLayoutConstraint constraintWithItem:sep
+                                                    attribute:NSLayoutAttributeWidth
+                                                    relatedBy:NSLayoutRelationEqual
+                                                       toItem:nil
+                                                    attribute:NSLayoutAttributeNotAnAttribute
+                                                   multiplier:1 constant:1]];
+    [sep addConstraint:[NSLayoutConstraint constraintWithItem:sep
+                                                    attribute:NSLayoutAttributeHeight
+                                                    relatedBy:NSLayoutRelationEqual
+                                                       toItem:nil
+                                                    attribute:NSLayoutAttributeNotAnAttribute
+                                                   multiplier:1 constant:16]];
+    return sep;
+}
+
 - (void)updateFromDocument:(MPDocument *)document line:(NSInteger)line column:(NSInteger)column selLen:(NSInteger)selLen {
-    _currentLine = line;
+    _currentLine   = line;
     _currentColumn = column;
     _selectionLength = selLen;
 
     _positionLabel.stringValue = [NSString stringWithFormat:@"Ln %ld, Col %ld", (long)line, (long)column];
 
     if (selLen > 0) {
-        _selectionLabel.stringValue = [NSString stringWithFormat:@"Sel: %ld char%@", (long)selLen, (selLen == 1 ? @"" : @"s")];
+        _selectionLabel.stringValue = [NSString stringWithFormat:@"Sel: %ld char%@",
+                                       (long)selLen, (selLen == 1 ? @"" : @"s")];
     } else {
         _selectionLabel.stringValue = @"";
     }
 
     if (document) {
-        _languageLabel.stringValue = [[SyntaxHighlighter sharedHighlighter] displayNameForLanguage:document.language];
-        _encodingLabel.stringValue = [document encodingName];
+        _languageLabel.stringValue   = [[SyntaxHighlighter sharedHighlighter] displayNameForLanguage:document.language];
+        _encodingLabel.stringValue   = [document encodingName];
         _lineEndingLabel.stringValue = [document lineEndingName];
     }
 }
@@ -104,12 +138,14 @@
 
 - (void)setCurrentLine:(NSInteger)currentLine {
     _currentLine = currentLine;
-    _positionLabel.stringValue = [NSString stringWithFormat:@"Ln %ld, Col %ld", (long)_currentLine, (long)_currentColumn];
+    _positionLabel.stringValue = [NSString stringWithFormat:@"Ln %ld, Col %ld",
+                                  (long)_currentLine, (long)_currentColumn];
 }
 
 - (void)setCurrentColumn:(NSInteger)currentColumn {
     _currentColumn = currentColumn;
-    _positionLabel.stringValue = [NSString stringWithFormat:@"Ln %ld, Col %ld", (long)_currentLine, (long)_currentColumn];
+    _positionLabel.stringValue = [NSString stringWithFormat:@"Ln %ld, Col %ld",
+                                  (long)_currentLine, (long)_currentColumn];
 }
 
 - (void)setTotalLines:(NSInteger)totalLines {

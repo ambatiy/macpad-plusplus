@@ -11,6 +11,14 @@ typedef NS_ENUM(NSInteger, MPColorTheme) {
     MPColorThemeMonokai,
     MPColorThemeSolarizedLight,
     MPColorThemeSolarizedDark,
+    MPColorThemeOneDarkPro,
+    MPColorThemeDracula,
+    MPColorThemeNord,
+    MPColorThemeGruvboxDark,
+    MPColorThemeGruvboxLight,
+    MPColorThemeTomorrowNight,
+    MPColorThemeCobalt2,
+    MPColorThemeMaterialDark,
 };
 
 @interface SyntaxHighlighter : NSObject

@@ -5,7 +5,8 @@
 #import "SciLexer.h"
 
 @interface EditorView ()
-@property (nonatomic, assign) NSInteger zoomLevel;
+@property (nonatomic, assign) NSInteger    zoomLevel;
+@property (nonatomic, assign) MPColorTheme appliedTheme;
 @end
 
 @implementation EditorView
@@ -52,6 +53,7 @@
     _showFolding = YES;
     _highlightCurrentLine = YES;
     _zoomLevel = 0;
+    _appliedTheme = (MPColorTheme)[[NSUserDefaults standardUserDefaults] integerForKey:MPPrefColorTheme];
 
     [self setupEditor];
 
@@ -153,14 +155,23 @@
 
 - (void)preferencesChanged:(NSNotification *)notification {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+
+    // Font / size
     NSString *newFont = [d stringForKey:MPPrefFontName] ?: @"Menlo";
     CGFloat newSize = [d doubleForKey:MPPrefFontSize];
     if (newSize < 6) newSize = 12;
-
     if (![newFont isEqualToString:_fontName] || newSize != _fontSize) {
         _fontName = newFont;
         _fontSize = newSize;
         [_scintillaView setFontName:_fontName size:(int)_fontSize bold:NO italic:NO];
+    }
+
+    // Color theme — re-apply if changed so live preview works in Preferences
+    MPColorTheme newTheme = (MPColorTheme)[d integerForKey:MPPrefColorTheme];
+    if (newTheme != _appliedTheme) {
+        _appliedTheme = newTheme;
+        NSString *lang = _document ? _document.language : @"none";
+        [[SyntaxHighlighter sharedHighlighter] applyTheme:newTheme toEditor:_scintillaView language:lang];
     }
 }
 

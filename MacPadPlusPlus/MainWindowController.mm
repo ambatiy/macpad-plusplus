@@ -129,6 +129,7 @@ static const CGFloat kTabMaxWidth = 220.0;
     MPTabButton *btn = [[MPTabButton alloc] initWithFrame:NSZeroRect];
     btn.document = document;
     btn.title = document.displayTitle;
+    btn.toolTip = document.fileURL ? document.fileURL.path : document.title;
     btn.isSelected = NO;
     btn.target = self.selectTarget;
     btn.action = self.selectAction;
@@ -162,6 +163,7 @@ static const CGFloat kTabMaxWidth = 220.0;
 - (void)refreshTitles {
     for (MPTabButton *btn in _tabButtons) {
         btn.title = btn.document.displayTitle;
+        btn.toolTip = btn.document.fileURL ? btn.document.fileURL.path : btn.document.title;
         [btn setNeedsDisplay:YES];
     }
 }
@@ -577,8 +579,11 @@ static const CGFloat kTabMaxWidth = 220.0;
             [alert runModal];
             return NO;
         }
+        // Apply re-detected language to the live editor
+        if (editor) [editor setLanguage:document.language];
         [_tabBarView refreshTitles];
         [self updateWindowTitle];
+        [self updateStatusBar];
         return YES;
     }
     return NO;

@@ -123,8 +123,13 @@ static NSInteger sNewDocumentCounter = 0;
     }
 
     if ([data writeToURL:url options:NSDataWritingAtomic error:error]) {
+        BOOL urlChanged = ![url isEqual:_fileURL];
         _fileURL = url;
         _title = url.lastPathComponent;
+        // Re-detect language when the file gets a new path (Save As)
+        if (urlChanged) {
+            _language = [self detectLanguageFromURL:url];
+        }
         _isModified = NO;
         _isNew = NO;
         return YES;
