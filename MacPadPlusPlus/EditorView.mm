@@ -112,9 +112,8 @@
     [v setGeneralProperty:SCI_SETVIEWWS value:(_showWhitespace ? SCWS_VISIBLEALWAYS : SCWS_INVISIBLE)];
     [v setGeneralProperty:SCI_SETVIEWEOL value:(_showEOL ? 1 : 0)];
 
-    // --- Edge line at column 80 ---
-    [v setGeneralProperty:SCI_SETEDGEMODE value:EDGE_LINE];
-    [v setGeneralProperty:SCI_SETEDGECOLUMN value:80];
+    // --- Edge line disabled ---
+    [v setGeneralProperty:SCI_SETEDGEMODE value:EDGE_NONE];
 
     // --- Scrolling ---
     [v setGeneralProperty:SCI_SETSCROLLWIDTHTRACKING value:1];

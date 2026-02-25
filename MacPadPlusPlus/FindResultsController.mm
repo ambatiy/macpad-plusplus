@@ -25,49 +25,43 @@ static NSString * const kColText = @"text";
     _results = [NSMutableArray new];
 
     // ── Header bar ────────────────────────────────────────────────────────────
-    static const CGFloat kHeaderH = 26.0;
+    static const CGFloat kHeaderH = 28.0;
 
     NSView *header = [[NSView alloc] initWithFrame:NSMakeRect(0, root.bounds.size.height - kHeaderH,
                                                               root.bounds.size.width, kHeaderH)];
-    header.wantsLayer = YES;
     header.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
 
-    // Dynamic background that adapts to light / dark mode
-    header.wantsLayer = YES;
-    [header setWantsLayer:YES];
-    // Use a view-based layer background so it re-evaluates in dark mode
-    NSVisualEffectView *blur = [[NSVisualEffectView alloc]
-                                initWithFrame:header.bounds];
-    blur.material = NSVisualEffectMaterialSidebar;
-    blur.blendingMode = NSVisualEffectBlendingModeWithinWindow;
-    blur.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [header addSubview:blur];
+    // Background — visual effect view (standard panel header, works in light + dark)
+    NSVisualEffectView *headerBg = [[NSVisualEffectView alloc] initWithFrame:header.bounds];
+    headerBg.material = NSVisualEffectMaterialWindowBackground;
+    headerBg.blendingMode = NSVisualEffectBlendingModeWithinWindow;
+    headerBg.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [header addSubview:headerBg];
 
-    // Top separator line (above header, since header is at the top of the panel)
-    NSView *topSep = [[NSView alloc] initWithFrame:NSMakeRect(0, kHeaderH - 1,
-                                                              800, 1)];
-    topSep.wantsLayer = YES;
-    topSep.layer.backgroundColor = [NSColor separatorColor].CGColor;
-    topSep.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
-    [root addSubview:topSep];
+    // Separator at the bottom edge of the header (divides header from table)
+    NSView *divider = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, root.bounds.size.width, 1)];
+    divider.wantsLayer = YES;
+    divider.layer.backgroundColor = [NSColor separatorColor].CGColor;
+    divider.autoresizingMask = NSViewWidthSizable;
+    [header addSubview:divider];
 
     // Header label
     _headerLabel = [NSTextField labelWithString:@"Find Results"];
     _headerLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
     _headerLabel.textColor = [NSColor secondaryLabelColor];
-    _headerLabel.frame = NSMakeRect(8, 4, 680, 18);
+    _headerLabel.frame = NSMakeRect(8, (kHeaderH - 16) / 2, 620, 16);
     _headerLabel.autoresizingMask = NSViewWidthSizable;
     [header addSubview:_headerLabel];
 
-    // Close button — circle X icon, no border, adapts to light/dark mode
-    NSButton *closeBtn = [[NSButton alloc] initWithFrame:NSMakeRect(root.bounds.size.width - 28, 3, 20, 20)];
-    closeBtn.image = [NSImage imageWithSystemSymbolName:@"xmark.circle.fill"
-                                 accessibilityDescription:@"Close Find Results"];
-    closeBtn.bezelStyle  = NSBezelStyleInline;
-    closeBtn.bordered    = NO;
-    closeBtn.imagePosition = NSImageOnly;
-    closeBtn.target      = self;
-    closeBtn.action      = @selector(closeResults);
+    // Close button — small labelled button, clearly visible in any theme
+    NSButton *closeBtn = [NSButton buttonWithTitle:@"Close"
+                                            target:self
+                                            action:@selector(closeResults)];
+    closeBtn.controlSize = NSControlSizeSmall;
+    closeBtn.font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
+    CGFloat btnW = 50, btnH = 18;
+    closeBtn.frame = NSMakeRect(root.bounds.size.width - btnW - 6,
+                                (kHeaderH - btnH) / 2, btnW, btnH);
     closeBtn.autoresizingMask = NSViewMinXMargin;
     [header addSubview:closeBtn];
 

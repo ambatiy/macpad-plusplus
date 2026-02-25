@@ -90,14 +90,15 @@ static const CGFloat kTabMaxWidth = 220.0;
            withAttributes:closeAttrs];
 }
 
-- (void)mouseUp:(NSEvent *)event {
+- (void)mouseDown:(NSEvent *)event {
     NSPoint pt = [self convertPoint:event.locationInWindow fromView:nil];
-    // Check if close button was clicked (right 20px)
+    // Close region — right 22 px. Handle on mouseDown so NSButton's
+    // tracking loop doesn't swallow the event before we see mouseUp.
     if (pt.x > self.bounds.size.width - 22) {
         [self.closeTarget performSelector:self.closeAction withObject:self];
-        return;
+        return;   // don't call super — this was a close-button click
     }
-    [super mouseUp:event];
+    [super mouseDown:event];
 }
 
 @end
